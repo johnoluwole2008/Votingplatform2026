@@ -1,0 +1,113 @@
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useLocation } from "wouter";
+import { useLoginAdmin, getGetAdminSessionQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
+import { useState } from "react";
+
+const schema = z.object({
+  email: z.string().email("Enter a valid email"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type FormData = z.infer<typeof schema>;
+
+export default function AdminLoginPage() {
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const login = useLoginAdmin();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const form = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { email: "", password: "" },
+  });
+
+  const onSubmit = (data: FormData) => {
+    setErrorMsg(null);
+    login.mutate(
+      { data: { email: data.email, password: data.password } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetAdminSessionQueryKey() });
+          setLocation("/admin/dashboard");
+        },
+        onError: (err: any) => {
+          const msg = err?.response?.data?.error ?? "Authentication failed. Check your credentials.";
+          setErrorMsg(msg);
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-muted/20 flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-4">
+            <ShieldCheck className="h-6 w-6 text-primary-foreground" />
+          </div>
+          <h1 className="text-xl font-bold text-foreground">Electoral Committee Access</h1>
+          <p className="text-sm text-muted-foreground mt-1">Secure administrator portal</p>
+        </div>
+
+        <div className="bg-card border border-border rounded-xl shadow-sm p-6">
+          {errorMsg && (
+            <div className="flex items-start gap-2 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg px-3 py-2.5 text-sm mb-5" data-testid="status-error">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Address</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="admin@faculty.edu" {...field} data-testid="input-email" autoComplete="username" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} data-testid="input-password" autoComplete="current-password" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button type="submit" className="w-full" disabled={login.isPending} data-testid="button-login">
+                {login.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Authenticating...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
+              </Button>
+            </form>
+          </Form>
+        </div>
+      </div>
+    </div>
+  );
+}

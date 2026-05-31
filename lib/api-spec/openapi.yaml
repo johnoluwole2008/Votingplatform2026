@@ -3,20 +3,44 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: PharmSci E-Voting Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Student authentication
+  - name: election
+    description: Election public info
+  - name: ballot
+    description: Voting ballot
+  - name: admin-auth
+    description: Admin authentication
+  - name: admin-dashboard
+    description: Admin dashboard analytics
+  - name: admin-voters
+    description: Admin voter management
+  - name: admin-offices
+    description: Admin offices & candidates management
+  - name: admin-results
+    description: Admin election results
+  - name: admin-audit
+    description: Admin audit logs
+  - name: admin-settings
+    description: Admin election settings
+  - name: admin-accounts
+    description: Admin account management
+  - name: admin-students
+    description: Admin student records
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +48,713 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── Election public status ──────────────────────────────────────────────────
+
+  /election/status:
+    get:
+      operationId: getElectionStatus
+      tags: [election]
+      summary: Get current election phase and settings
+      responses:
+        "200":
+          description: Election status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ElectionStatus"
+
+  # ── Student auth ────────────────────────────────────────────────────────────
+
+  /auth/register:
+    post:
+      operationId: registerVoter
+      tags: [auth]
+      summary: Register a student voter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoterRegistrationInput"
+      responses:
+        "201":
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResult"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: Already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /auth/login:
+    post:
+      operationId: loginVoter
+      tags: [auth]
+      summary: Login on voting day
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoterLoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoterSession"
+        "401":
+          description: Invalid credentials or locked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /auth/logout:
+    post:
+      operationId: logoutVoter
+      tags: [auth]
+      summary: Logout student voter
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getVoterSession
+      tags: [auth]
+      summary: Get current voter session
+      responses:
+        "200":
+          description: Session info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoterSession"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Ballot ──────────────────────────────────────────────────────────────────
+
+  /ballot:
+    get:
+      operationId: getBallot
+      tags: [ballot]
+      summary: Get ballot with all offices and candidates
+      responses:
+        "200":
+          description: Ballot data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ballot"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Already voted or not voting phase
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /ballot/submit:
+    post:
+      operationId: submitBallot
+      tags: [ballot]
+      summary: Submit completed ballot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BallotSubmission"
+      responses:
+        "200":
+          description: Ballot submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Invalid ballot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Already voted or not voting phase
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Admin auth ──────────────────────────────────────────────────────────────
+
+  /admin/auth/login:
+    post:
+      operationId: loginAdmin
+      tags: [admin-auth]
+      summary: Admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSession"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /admin/auth/logout:
+    post:
+      operationId: logoutAdmin
+      tags: [admin-auth]
+      summary: Admin logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/auth/me:
+    get:
+      operationId: getAdminSession
+      tags: [admin-auth]
+      summary: Get current admin session
+      responses:
+        "200":
+          description: Admin session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSession"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Admin dashboard ─────────────────────────────────────────────────────────
+
+  /admin/dashboard:
+    get:
+      operationId: getDashboardStats
+      tags: [admin-dashboard]
+      summary: Get real-time election dashboard statistics
+      responses:
+        "200":
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /admin/dashboard/turnout-timeline:
+    get:
+      operationId: getTurnoutTimeline
+      tags: [admin-dashboard]
+      summary: Get voter turnout over time on voting day
+      responses:
+        "200":
+          description: Turnout timeline
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TurnoutTimelinePoint"
+
+  /admin/dashboard/results-preview:
+    get:
+      operationId: getResultsPreview
+      tags: [admin-dashboard]
+      summary: Get per-office vote counts for live dashboard charts
+      responses:
+        "200":
+          description: Results preview
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OfficeResult"
+
+  # ── Admin voters ────────────────────────────────────────────────────────────
+
+  /admin/voters:
+    get:
+      operationId: listVoters
+      tags: [admin-voters]
+      summary: List all registered voters
+      parameters:
+        - name: level
+          in: query
+          schema:
+            type: string
+        - name: voted
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Voters list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoterListResponse"
+
+  /admin/voters/{id}:
+    patch:
+      operationId: updateVoter
+      tags: [admin-voters]
+      summary: Update voter record (name or level only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoterUpdate"
+      responses:
+        "200":
+          description: Updated voter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Voter"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    delete:
+      operationId: deleteVoter
+      tags: [admin-voters]
+      summary: Invalidate/delete a voter registration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/voters/export:
+    get:
+      operationId: exportVoters
+      tags: [admin-voters]
+      summary: Export voter registration data as CSV
+      responses:
+        "200":
+          description: CSV data
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  # ── Admin offices & candidates ───────────────────────────────────────────────
+
+  /admin/offices:
+    get:
+      operationId: listOffices
+      tags: [admin-offices]
+      summary: List all offices with their candidates
+      responses:
+        "200":
+          description: Offices list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Office"
+    post:
+      operationId: createOffice
+      tags: [admin-offices]
+      summary: Create a new election office
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OfficeInput"
+      responses:
+        "201":
+          description: Created office
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Office"
+
+  /admin/offices/{id}:
+    put:
+      operationId: updateOffice
+      tags: [admin-offices]
+      summary: Update an office
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OfficeInput"
+      responses:
+        "200":
+          description: Updated office
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Office"
+    delete:
+      operationId: deleteOffice
+      tags: [admin-offices]
+      summary: Delete an office
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/candidates:
+    post:
+      operationId: createCandidate
+      tags: [admin-offices]
+      summary: Add a candidate to an office
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CandidateInput"
+      responses:
+        "201":
+          description: Created candidate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Candidate"
+
+  /admin/candidates/{id}:
+    put:
+      operationId: updateCandidate
+      tags: [admin-offices]
+      summary: Update a candidate
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CandidateInput"
+      responses:
+        "200":
+          description: Updated candidate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Candidate"
+    delete:
+      operationId: deleteCandidate
+      tags: [admin-offices]
+      summary: Delete a candidate
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ── Admin results ────────────────────────────────────────────────────────────
+
+  /admin/results:
+    get:
+      operationId: getElectionResults
+      tags: [admin-results]
+      summary: Get final election results per office
+      responses:
+        "200":
+          description: Election results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OfficeResult"
+
+  /admin/results/export:
+    get:
+      operationId: exportResults
+      tags: [admin-results]
+      summary: Export results as CSV
+      responses:
+        "200":
+          description: CSV results
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  # ── Admin audit logs ─────────────────────────────────────────────────────────
+
+  /admin/audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [admin-audit]
+      summary: List audit log entries
+      parameters:
+        - name: event
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogResponse"
+
+  /admin/audit-logs/export:
+    get:
+      operationId: exportAuditLogs
+      tags: [admin-audit]
+      summary: Export audit logs as CSV
+      responses:
+        "200":
+          description: CSV audit log
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  # ── Admin election settings ──────────────────────────────────────────────────
+
+  /admin/settings:
+    get:
+      operationId: getElectionSettings
+      tags: [admin-settings]
+      summary: Get election phase date/time settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ElectionSettings"
+    put:
+      operationId: updateElectionSettings
+      tags: [admin-settings]
+      summary: Update election phase settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ElectionSettingsInput"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ElectionSettings"
+
+  # ── Admin accounts ───────────────────────────────────────────────────────────
+
+  /admin/accounts:
+    get:
+      operationId: listAdminAccounts
+      tags: [admin-accounts]
+      summary: List admin accounts (super admin only)
+      responses:
+        "200":
+          description: Admin accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminAccount"
+    post:
+      operationId: createAdminAccount
+      tags: [admin-accounts]
+      summary: Create admin account (super admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminAccountInput"
+      responses:
+        "201":
+          description: Created admin account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAccount"
+
+  /admin/accounts/{id}:
+    delete:
+      operationId: deleteAdminAccount
+      tags: [admin-accounts]
+      summary: Delete admin account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ── Admin student records ─────────────────────────────────────────────────────
+
+  /admin/student-records:
+    get:
+      operationId: listStudentRecords
+      tags: [admin-students]
+      summary: List official student records used for validation
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: level
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Student records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentRecordListResponse"
+    post:
+      operationId: importStudentRecords
+      tags: [admin-students]
+      summary: Bulk import student records (JSON array)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentRecordImport"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +762,534 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required: [success]
+
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: ["string", "null"]
+      required: [error]
+
+    # ── Election ────────────────────────────────────────────────────────────────
+
+    ElectionStatus:
+      type: object
+      properties:
+        phase:
+          type: string
+          enum: [setup, registration, voting, results, audit]
+        registrationOpen:
+          type: boolean
+        votingOpen:
+          type: boolean
+        registrationStart:
+          type: ["string", "null"]
+        registrationEnd:
+          type: ["string", "null"]
+        votingStart:
+          type: ["string", "null"]
+        votingEnd:
+          type: ["string", "null"]
+        electionName:
+          type: string
+        totalStudents:
+          type: integer
+      required: [phase, registrationOpen, votingOpen, electionName, totalStudents]
+
+    ElectionSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+        electionName:
+          type: string
+        registrationStart:
+          type: ["string", "null"]
+        registrationEnd:
+          type: ["string", "null"]
+        votingStart:
+          type: ["string", "null"]
+        votingEnd:
+          type: ["string", "null"]
+        showLiveResults:
+          type: boolean
+        totalExpectedVoters:
+          type: integer
+      required: [id, electionName, showLiveResults, totalExpectedVoters]
+
+    ElectionSettingsInput:
+      type: object
+      properties:
+        electionName:
+          type: string
+        registrationStart:
+          type: ["string", "null"]
+        registrationEnd:
+          type: ["string", "null"]
+        votingStart:
+          type: ["string", "null"]
+        votingEnd:
+          type: ["string", "null"]
+        showLiveResults:
+          type: boolean
+        totalExpectedVoters:
+          type: integer
+      required: [electionName, showLiveResults, totalExpectedVoters]
+
+    # ── Student auth ────────────────────────────────────────────────────────────
+
+    VoterRegistrationInput:
+      type: object
+      properties:
+        matricNumber:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        fullName:
+          type: string
+        level:
+          type: string
+          enum: ["100L", "200L", "300L", "400L", "500L", "600L"]
+      required: [matricNumber, email, password, fullName, level]
+
+    RegistrationResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        matricNumber:
+          type: string
+        fullName:
+          type: string
+        level:
+          type: string
+      required: [success, message, matricNumber, fullName, level]
+
+    VoterLoginInput:
+      type: object
+      properties:
+        matricNumber:
+          type: string
+        password:
+          type: string
+      required: [matricNumber, password]
+
+    VoterSession:
+      type: object
+      properties:
+        id:
+          type: integer
+        matricNumber:
+          type: string
+        fullName:
+          type: string
+        level:
+          type: string
+        hasVoted:
+          type: boolean
+      required: [id, matricNumber, fullName, level, hasVoted]
+
+    # ── Ballot ──────────────────────────────────────────────────────────────────
+
+    Candidate:
+      type: object
+      properties:
+        id:
+          type: integer
+        officeId:
+          type: integer
+        fullName:
+          type: string
+        bio:
+          type: ["string", "null"]
+        photoUrl:
+          type: ["string", "null"]
+        level:
+          type: ["string", "null"]
+      required: [id, officeId, fullName]
+
+    Office:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        displayOrder:
+          type: integer
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/Candidate"
+      required: [id, title, displayOrder, candidates]
+
+    Ballot:
+      type: object
+      properties:
+        offices:
+          type: array
+          items:
+            $ref: "#/components/schemas/Office"
+        voterName:
+          type: string
+        voterLevel:
+          type: string
+      required: [offices, voterName, voterLevel]
+
+    BallotVote:
+      type: object
+      properties:
+        officeId:
+          type: integer
+        candidateId:
+          type: integer
+      required: [officeId, candidateId]
+
+    BallotSubmission:
+      type: object
+      properties:
+        votes:
+          type: array
+          items:
+            $ref: "#/components/schemas/BallotVote"
+      required: [votes]
+
+    # ── Admin session ───────────────────────────────────────────────────────────
+
+    AdminLoginInput:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        totpCode:
+          type: ["string", "null"]
+      required: [email, password]
+
+    AdminSession:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, editor, observer]
+      required: [id, email, name, role]
+
+    AdminAccount:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, editor, observer]
+        createdAt:
+          type: string
+        lastLogin:
+          type: ["string", "null"]
+      required: [id, email, name, role, createdAt]
+
+    AdminAccountInput:
+      type: object
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, editor, observer]
+      required: [email, name, password, role]
+
+    # ── Dashboard ───────────────────────────────────────────────────────────────
+
+    LevelBreakdown:
+      type: object
+      properties:
+        level:
+          type: string
+        registered:
+          type: integer
+        voted:
+          type: integer
+      required: [level, registered, voted]
+
+    DashboardStats:
+      type: object
+      properties:
+        totalRegistered:
+          type: integer
+        totalVoted:
+          type: integer
+        totalExpected:
+          type: integer
+        registrationRate:
+          type: number
+        turnoutRate:
+          type: number
+        byLevel:
+          type: array
+          items:
+            $ref: "#/components/schemas/LevelBreakdown"
+        phase:
+          type: string
+        registrationOpen:
+          type: boolean
+        votingOpen:
+          type: boolean
+      required: [totalRegistered, totalVoted, totalExpected, registrationRate, turnoutRate, byLevel, phase, registrationOpen, votingOpen]
+
+    TurnoutTimelinePoint:
+      type: object
+      properties:
+        hour:
+          type: string
+        cumulative:
+          type: integer
+        delta:
+          type: integer
+      required: [hour, cumulative, delta]
+
+    CandidateResult:
+      type: object
+      properties:
+        candidateId:
+          type: integer
+        candidateName:
+          type: string
+        voteCount:
+          type: integer
+        percentage:
+          type: number
+        isWinner:
+          type: boolean
+        isTie:
+          type: boolean
+      required: [candidateId, candidateName, voteCount, percentage, isWinner, isTie]
+
+    OfficeResult:
+      type: object
+      properties:
+        officeId:
+          type: integer
+        officeTitle:
+          type: string
+        totalVotes:
+          type: integer
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/CandidateResult"
+      required: [officeId, officeTitle, totalVotes, candidates]
+
+    # ── Voters ──────────────────────────────────────────────────────────────────
+
+    Voter:
+      type: object
+      properties:
+        id:
+          type: integer
+        matricNumber:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+        level:
+          type: string
+        hasVoted:
+          type: boolean
+        registrationTimestamp:
+          type: string
+        ipAddress:
+          type: ["string", "null"]
+        voteTimestamp:
+          type: ["string", "null"]
+      required: [id, matricNumber, fullName, email, level, hasVoted, registrationTimestamp]
+
+    VoterUpdate:
+      type: object
+      properties:
+        fullName:
+          type: string
+        level:
+          type: string
+          enum: ["100L", "200L", "300L", "400L", "500L", "600L"]
+
+    VoterListResponse:
+      type: object
+      properties:
+        voters:
+          type: array
+          items:
+            $ref: "#/components/schemas/Voter"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required: [voters, total, page, limit]
+
+    # ── Offices & Candidates ─────────────────────────────────────────────────────
+
+    OfficeInput:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        displayOrder:
+          type: integer
+      required: [title, displayOrder]
+
+    CandidateInput:
+      type: object
+      properties:
+        officeId:
+          type: integer
+        fullName:
+          type: string
+        bio:
+          type: ["string", "null"]
+        photoUrl:
+          type: ["string", "null"]
+        level:
+          type: ["string", "null"]
+      required: [officeId, fullName]
+
+    # ── Audit ────────────────────────────────────────────────────────────────────
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventType:
+          type: string
+        description:
+          type: string
+        actorId:
+          type: ["string", "null"]
+        actorType:
+          type: string
+          enum: [student, admin, system]
+        ipAddress:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        metadata:
+          type: ["string", "null"]
+      required: [id, eventType, description, actorType, createdAt]
+
+    AuditLogResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required: [logs, total, page, limit]
+
+    # ── Student records ──────────────────────────────────────────────────────────
+
+    StudentRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        matricNumber:
+          type: string
+        email:
+          type: string
+        fullName:
+          type: string
+        level:
+          type: string
+        isRegistered:
+          type: boolean
+      required: [id, matricNumber, email, fullName, level, isRegistered]
+
+    StudentRecordListResponse:
+      type: object
+      properties:
+        students:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudentRecord"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required: [students, total, page, limit]
+
+    StudentRecordImport:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            type: object
+            properties:
+              matricNumber:
+                type: string
+              email:
+                type: string
+              fullName:
+                type: string
+              level:
+                type: string
+            required: [matricNumber, email, fullName, level]
+      required: [records]
+
+    ImportResult:
+      type: object
+      properties:
+        imported:
+          type: integer
+        skipped:
+          type: integer
+        errors:
+          type: integer
+        message:
+          type: string
+      required: [imported, skipped, errors, message]
