@@ -106,9 +106,11 @@ export default function IndexPage() {
               </div>
             )}
             {(status?.phase === "results" || status?.phase === "audit") && (
-              <div className="text-muted-foreground text-sm py-3 px-6 border border-border rounded-lg">
-                Voting has closed. Results are being verified by the Electoral Committee.
-              </div>
+              <Link href="/results">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto px-10" data-testid="button-results">
+                  View Results
+                </Button>
+              </Link>
             )}
           </div>
 

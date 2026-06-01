@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, count, ilike, and, sql } from "drizzle-orm";
+import { eq, count, and, sql, inArray } from "drizzle-orm";
 import { db, studentRecordsTable, voterRegistrationsTable } from "@workspace/db";
 import { logAuditEvent } from "../../lib/audit";
 import { ImportStudentRecordsBody } from "@workspace/api-zod";
@@ -53,7 +53,7 @@ router.get("/admin/student-records", async (req, res): Promise<void> => {
     ? await db
         .select({ matricNumber: voterRegistrationsTable.matricNumber })
         .from(voterRegistrationsTable)
-        .where(sql`${voterRegistrationsTable.matricNumber} = ANY(${matricNumbers})`)
+        .where(inArray(voterRegistrationsTable.matricNumber, matricNumbers))
     : [];
 
   const registeredSet = new Set(registeredVoters.map((v) => v.matricNumber));

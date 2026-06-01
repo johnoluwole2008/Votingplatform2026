@@ -21,6 +21,7 @@ import AdminAuditPage from "@/pages/admin/audit";
 import AdminSettingsPage from "@/pages/admin/settings";
 import AdminAccountsPage from "@/pages/admin/accounts";
 import AdminStudentsPage from "@/pages/admin/students";
+import ResultsPage from "@/pages/results";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/admin/settings" component={AdminSettingsPage} />
       <Route path="/admin/accounts" component={AdminAccountsPage} />
       <Route path="/admin/students" component={AdminStudentsPage} />
+      <Route path="/results" component={ResultsPage} />
 
       <Route component={NotFound} />
     </Switch>
