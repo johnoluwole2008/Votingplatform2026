@@ -49,7 +49,8 @@ export const RegisterVoterBody = zod.object({
  */
 export const LoginVoterBody = zod.object({
   "matricNumber": zod.string(),
-  "password": zod.string()
+  "email": zod.string(),
+  "personalCode": zod.string()
 })
 
 export const LoginVoterResponse = zod.object({
@@ -537,7 +538,7 @@ export const ListStudentRecordsResponse = zod.object({
   "email": zod.string(),
   "fullName": zod.string(),
   "level": zod.string(),
-  "isRegistered": zod.boolean()
+  "hasVoted": zod.boolean()
 })),
   "total": zod.number(),
   "page": zod.number(),
@@ -553,7 +554,8 @@ export const ImportStudentRecordsBody = zod.object({
   "matricNumber": zod.string(),
   "email": zod.string(),
   "fullName": zod.string(),
-  "level": zod.string()
+  "level": zod.string(),
+  "personalCode": zod.string().optional()
 }))
 })
 

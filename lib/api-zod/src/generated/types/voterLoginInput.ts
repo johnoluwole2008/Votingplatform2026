@@ -8,5 +8,6 @@
 
 export interface VoterLoginInput {
   matricNumber: string;
-  password: string;
+  email: string;
+  personalCode: string;
 }

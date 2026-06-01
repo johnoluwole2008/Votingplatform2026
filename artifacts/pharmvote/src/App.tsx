@@ -5,8 +5,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 
 import IndexPage from "@/pages/index";
-import RegisterPage from "@/pages/register";
-import RegisterSuccessPage from "@/pages/register-success";
 import LoginPage from "@/pages/login";
 import BallotPage from "@/pages/ballot";
 import BallotReviewPage from "@/pages/ballot-review";
@@ -33,8 +31,6 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={IndexPage} />
-      <Route path="/register" component={RegisterPage} />
-      <Route path="/register/success" component={RegisterSuccessPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/ballot" component={BallotPage} />
       <Route path="/ballot/review" component={BallotReviewPage} />

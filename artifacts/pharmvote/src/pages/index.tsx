@@ -81,13 +81,6 @@ export default function IndexPage() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            {(status?.phase === "registration" || !status) && (
-              <Link href="/register">
-                <Button size="lg" className="w-full sm:w-auto px-10" data-testid="button-register">
-                  Register to Vote
-                </Button>
-              </Link>
-            )}
             {(status?.phase === "voting" || !status) && (
               <Link href="/login">
                 <Button
@@ -100,9 +93,9 @@ export default function IndexPage() {
                 </Button>
               </Link>
             )}
-            {status?.phase === "setup" && (
+            {(status?.phase === "setup" || status?.phase === "registration") && (
               <div className="text-muted-foreground text-sm py-3 px-6 border border-border rounded-lg">
-                The election has not yet opened. Check back soon.
+                The election has not yet opened. Check back on Election Day.
               </div>
             )}
             {(status?.phase === "results" || status?.phase === "audit") && (

@@ -7,6 +7,7 @@ import { useAdminSession } from "@/hooks/use-voter-session";
 import {
   useListOffices,
   useCreateOffice,
+  useUpdateOffice,
   useDeleteOffice,
   useCreateCandidate,
   useDeleteCandidate,
@@ -16,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, Trash2, Vote, ChevronDown, ChevronUp, UserPlus } from "lucide-react";
+import { Loader2, Plus, Trash2, Vote, ChevronDown, ChevronUp, UserPlus, Pencil, Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const officeSchema = z.object({
@@ -32,8 +33,15 @@ const candidateSchema = z.object({
   officeId: z.number(),
 });
 
+const editOfficeSchema = z.object({
+  title: z.string().min(1, "Office title required"),
+  description: z.string().optional(),
+  displayOrder: z.coerce.number().default(0),
+});
+
 type OfficeFormData = z.infer<typeof officeSchema>;
 type CandidateFormData = z.infer<typeof candidateSchema>;
+type EditOfficeFormData = z.infer<typeof editOfficeSchema>;
 
 interface OfficeWithCandidates {
   id: number;
@@ -49,10 +57,12 @@ export default function AdminOfficesPage() {
   const queryClient = useQueryClient();
   const [expandedOffice, setExpandedOffice] = useState<number | null>(null);
   const [addingCandidateFor, setAddingCandidateFor] = useState<number | null>(null);
+  const [editingOfficeId, setEditingOfficeId] = useState<number | null>(null);
   const [showOfficeForm, setShowOfficeForm] = useState(false);
 
   const { data: offices, isLoading } = useListOffices();
   const createOffice = useCreateOffice();
+  const updateOffice = useUpdateOffice();
   const deleteOffice = useDeleteOffice();
   const createCandidate = useCreateCandidate();
   const deleteCandidate = useDeleteCandidate();
@@ -62,6 +72,11 @@ export default function AdminOfficesPage() {
   const officeForm = useForm<OfficeFormData>({
     resolver: zodResolver(officeSchema),
     defaultValues: { title: "", description: "", displayOrder: (offices?.length ?? 0) + 1 },
+  });
+
+  const editOfficeForm = useForm<EditOfficeFormData>({
+    resolver: zodResolver(editOfficeSchema),
+    defaultValues: { title: "", description: "", displayOrder: 0 },
   });
 
   const candidateForm = useForm<CandidateFormData>({
@@ -80,6 +95,30 @@ export default function AdminOfficesPage() {
           setShowOfficeForm(false);
         },
         onError: () => toast({ title: "Failed to create office", variant: "destructive" }),
+      },
+    );
+  };
+
+  const handleStartEdit = (office: OfficeWithCandidates) => {
+    editOfficeForm.reset({
+      title: office.title,
+      description: office.description ?? "",
+      displayOrder: office.displayOrder,
+    });
+    setEditingOfficeId(office.id);
+  };
+
+  const handleSaveEdit = (data: EditOfficeFormData) => {
+    if (!editingOfficeId) return;
+    updateOffice.mutate(
+      { id: editingOfficeId, data },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["listOffices"] });
+          toast({ title: "Office updated" });
+          setEditingOfficeId(null);
+        },
+        onError: () => toast({ title: "Failed to update office", variant: "destructive" }),
       },
     );
   };
@@ -201,30 +240,81 @@ export default function AdminOfficesPage() {
           <div className="space-y-3">
             {(offices as unknown as OfficeWithCandidates[]).map((office) => (
               <div key={office.id} className="bg-card border border-border rounded-xl overflow-hidden" data-testid={`office-card-${office.id}`}>
-                <div
-                  className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-muted/20"
-                  onClick={() => setExpandedOffice(expandedOffice === office.id ? null : office.id)}
-                >
-                  <div>
-                    <div className="font-semibold text-foreground">{office.title}</div>
-                    {office.description && <div className="text-xs text-muted-foreground mt-0.5">{office.description}</div>}
-                    <div className="text-xs text-muted-foreground mt-1">{office.candidates.length} candidate{office.candidates.length !== 1 ? "s" : ""}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!isObserver && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteOffice(office.id, office.title); }}
-                        className="text-muted-foreground hover:text-destructive p-1 transition-colors"
-                        data-testid={`button-delete-office-${office.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                    {expandedOffice === office.id ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                  </div>
-                </div>
 
-                {expandedOffice === office.id && (
+                {/* Edit mode */}
+                {editingOfficeId === office.id ? (
+                  <div className="px-5 py-4">
+                    <Form {...editOfficeForm}>
+                      <form onSubmit={editOfficeForm.handleSubmit(handleSaveEdit)} className="space-y-3">
+                        <div className="grid grid-cols-3 gap-3">
+                          <FormField control={editOfficeForm.control} name="title" render={({ field }) => (
+                            <FormItem className="col-span-2">
+                              <FormLabel className="text-xs">Office Title</FormLabel>
+                              <FormControl><Input {...field} data-testid={`input-edit-title-${office.id}`} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={editOfficeForm.control} name="displayOrder" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Order</FormLabel>
+                              <FormControl><Input type="number" {...field} /></FormControl>
+                            </FormItem>
+                          )} />
+                        </div>
+                        <FormField control={editOfficeForm.control} name="description" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Description (optional)</FormLabel>
+                            <FormControl><Input {...field} placeholder="Brief description" /></FormControl>
+                          </FormItem>
+                        )} />
+                        <div className="flex gap-2">
+                          <Button type="submit" size="sm" disabled={updateOffice.isPending}>
+                            {updateOffice.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+                            Save
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" onClick={() => setEditingOfficeId(null)}>
+                            <X className="h-3 w-3 mr-1" /> Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </div>
+                ) : (
+                  <div
+                    className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-muted/20"
+                    onClick={() => setExpandedOffice(expandedOffice === office.id ? null : office.id)}
+                  >
+                    <div>
+                      <div className="font-semibold text-foreground">{office.title}</div>
+                      {office.description && <div className="text-xs text-muted-foreground mt-0.5">{office.description}</div>}
+                      <div className="text-xs text-muted-foreground mt-1">{office.candidates.length} candidate{office.candidates.length !== 1 ? "s" : ""}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!isObserver && (
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleStartEdit(office); }}
+                            className="text-muted-foreground hover:text-primary p-1 transition-colors"
+                            title="Edit office"
+                            data-testid={`button-edit-office-${office.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteOffice(office.id, office.title); }}
+                            className="text-muted-foreground hover:text-destructive p-1 transition-colors"
+                            data-testid={`button-delete-office-${office.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                      {expandedOffice === office.id ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                    </div>
+                  </div>
+                )}
+
+                {expandedOffice === office.id && editingOfficeId !== office.id && (
                   <div className="border-t border-border">
                     {office.candidates.map((c) => (
                       <div key={c.id} className="flex items-center justify-between px-5 py-3 border-b border-border last:border-0" data-testid={`candidate-card-${c.id}`}>

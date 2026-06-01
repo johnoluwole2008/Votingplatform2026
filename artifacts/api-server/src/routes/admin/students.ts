@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { eq, count, and, sql, inArray } from "drizzle-orm";
-import { db, studentRecordsTable, voterRegistrationsTable } from "@workspace/db";
+import { eq, count, and, sql } from "drizzle-orm";
+import { db, studentRecordsTable } from "@workspace/db";
 import { logAuditEvent } from "../../lib/audit";
 import { ImportStudentRecordsBody } from "@workspace/api-zod";
+import { hashPassword } from "../../lib/auth";
 
 const router = Router();
 
@@ -47,17 +48,6 @@ router.get("/admin/student-records", async (req, res): Promise<void> => {
     .limit(limitNum)
     .offset(offset);
 
-  // Check which ones have registered
-  const matricNumbers = records.map((r) => r.matricNumber);
-  const registeredVoters = matricNumbers.length > 0
-    ? await db
-        .select({ matricNumber: voterRegistrationsTable.matricNumber })
-        .from(voterRegistrationsTable)
-        .where(inArray(voterRegistrationsTable.matricNumber, matricNumbers))
-    : [];
-
-  const registeredSet = new Set(registeredVoters.map((v) => v.matricNumber));
-
   res.json({
     students: records.map((r) => ({
       id: r.id,
@@ -65,7 +55,7 @@ router.get("/admin/student-records", async (req, res): Promise<void> => {
       email: r.email,
       fullName: r.fullName,
       level: r.level,
-      isRegistered: registeredSet.has(r.matricNumber),
+      hasVoted: r.hasVoted,
     })),
     total: Number(totalResult?.count ?? 0),
     page: pageNum,
@@ -86,15 +76,34 @@ router.post("/admin/student-records", async (req, res): Promise<void> => {
 
   for (const record of records) {
     try {
+      let personalCodeHash: string | undefined;
+      if (record.personalCode && record.personalCode.trim().length > 0) {
+        personalCodeHash = await hashPassword(record.personalCode.trim());
+      }
+
+      const values: any = {
+        matricNumber: record.matricNumber.toUpperCase(),
+        email: record.email.toLowerCase(),
+        fullName: record.fullName,
+        level: record.level as never,
+      };
+
+      if (personalCodeHash) {
+        values.personalCodeHash = personalCodeHash;
+      }
+
       await db
         .insert(studentRecordsTable)
-        .values({
-          matricNumber: record.matricNumber.toUpperCase(),
-          email: record.email.toLowerCase(),
-          fullName: record.fullName,
-          level: record.level as never,
-        })
-        .onConflictDoNothing();
+        .values(values)
+        .onConflictDoUpdate({
+          target: studentRecordsTable.matricNumber,
+          set: {
+            email: record.email.toLowerCase(),
+            fullName: record.fullName,
+            level: record.level as never,
+            ...(personalCodeHash ? { personalCodeHash } : {}),
+          },
+        });
       imported++;
     } catch {
       errors++;

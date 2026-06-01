@@ -13,7 +13,8 @@ import { useState } from "react";
 
 const schema = z.object({
   matricNumber: z.string().min(1, "Matric number is required"),
-  password: z.string().min(1, "Password is required"),
+  email: z.string().email("Enter a valid email address"),
+  personalCode: z.string().min(1, "Personal code is required"),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -27,13 +28,13 @@ export default function LoginPage() {
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { matricNumber: "", password: "" },
+    defaultValues: { matricNumber: "", email: "", personalCode: "" },
   });
 
   const onSubmit = (data: FormData) => {
     setErrorMsg(null);
     login.mutate(
-      { data: { matricNumber: data.matricNumber, password: data.password } },
+      { data: { matricNumber: data.matricNumber, email: data.email, personalCode: data.personalCode } },
       {
         onSuccess: (session) => {
           queryClient.invalidateQueries({ queryKey: getGetVoterSessionQueryKey() });
@@ -77,7 +78,7 @@ export default function LoginPage() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-foreground">Voting Day Login</h1>
-                <p className="text-xs text-muted-foreground">Use your registration credentials</p>
+                <p className="text-xs text-muted-foreground">Use your matric number, email, and personal code</p>
               </div>
             </div>
 
@@ -97,7 +98,7 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel>Matric Number</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter your matric number" {...field} data-testid="input-matric-number" autoComplete="username" />
+                        <Input placeholder="e.g. PHA/2024/001" {...field} data-testid="input-matric-number" autoComplete="username" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -106,12 +107,26 @@ export default function LoginPage() {
 
                 <FormField
                   control={form.control}
-                  name="password"
+                  name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Voting Password</FormLabel>
+                      <FormLabel>Email Address</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="Your voting password" {...field} data-testid="input-password" autoComplete="current-password" />
+                        <Input type="email" placeholder="Your school email address" {...field} data-testid="input-email" autoComplete="email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="personalCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Personal Code</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Your personal code from registration" {...field} data-testid="input-personal-code" autoComplete="current-password" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -128,12 +143,6 @@ export default function LoginPage() {
               Account is locked after 5 failed attempts for 15 minutes. If you have trouble, contact the Electoral Committee.
             </p>
           </div>
-
-          <p className="text-xs text-muted-foreground text-center mt-4">
-            Not yet registered?{" "}
-            {/* Registration only available in registration phase */}
-            <Link href="/register"><span className="text-primary cursor-pointer hover:underline">Register to vote</span></Link>
-          </p>
         </div>
       </main>
     </div>

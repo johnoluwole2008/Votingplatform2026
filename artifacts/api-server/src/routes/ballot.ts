@@ -6,7 +6,7 @@ import {
   officesTable,
   candidatesTable,
   votesTable,
-  voterRegistrationsTable,
+  studentRecordsTable,
 } from "@workspace/db";
 import { logAuditEvent } from "../lib/audit";
 import { getElectionPhase } from "../lib/election";
@@ -31,18 +31,18 @@ router.get("/ballot", async (req, res): Promise<void> => {
     return;
   }
 
-  const [voter] = await db
+  const [student] = await db
     .select()
-    .from(voterRegistrationsTable)
-    .where(eq(voterRegistrationsTable.id, req.session.voterId!))
+    .from(studentRecordsTable)
+    .where(eq(studentRecordsTable.id, req.session.voterId!))
     .limit(1);
 
-  if (!voter) {
+  if (!student) {
     res.status(401).json({ error: "Session invalid" });
     return;
   }
 
-  if (voter.hasVoted) {
+  if (student.hasVoted) {
     res.status(403).json({ error: "You have already cast your vote." });
     return;
   }
@@ -73,8 +73,8 @@ router.get("/ballot", async (req, res): Promise<void> => {
 
   res.json({
     offices: ballot,
-    voterName: voter.fullName,
-    voterLevel: voter.level,
+    voterName: student.fullName,
+    voterLevel: student.level,
   });
 });
 
@@ -93,21 +93,20 @@ router.post("/ballot/submit", async (req, res): Promise<void> => {
     return;
   }
 
-  const voterId = req.session.voterId!;
+  const studentId = req.session.voterId!;
 
-  // Atomically mark as voted and record votes in one transaction-like sequence
-  const [voter] = await db
+  const [student] = await db
     .select()
-    .from(voterRegistrationsTable)
-    .where(eq(voterRegistrationsTable.id, voterId))
+    .from(studentRecordsTable)
+    .where(eq(studentRecordsTable.id, studentId))
     .limit(1);
 
-  if (!voter) {
+  if (!student) {
     res.status(401).json({ error: "Session invalid" });
     return;
   }
 
-  if (voter.hasVoted) {
+  if (student.hasVoted) {
     res.status(403).json({ error: "You have already cast your vote." });
     return;
   }
@@ -116,7 +115,6 @@ router.post("/ballot/submit", async (req, res): Promise<void> => {
   const officeIds = offices.map((o) => o.id);
   const { votes } = parsed.data;
 
-  // Validate: all offices must have exactly one vote
   const votedOfficeIds = votes.map((v) => v.officeId);
   const missingOffices = officeIds.filter((id) => !votedOfficeIds.includes(id));
   if (missingOffices.length > 0) {
@@ -126,7 +124,6 @@ router.post("/ballot/submit", async (req, res): Promise<void> => {
     return;
   }
 
-  // Validate candidates belong to the correct offices
   const candidateIds = votes.map((v) => v.candidateId);
   const validCandidates = await db
     .select()
@@ -141,13 +138,11 @@ router.post("/ballot/submit", async (req, res): Promise<void> => {
     }
   }
 
-  // Mark voter as voted
   await db
-    .update(voterRegistrationsTable)
+    .update(studentRecordsTable)
     .set({ hasVoted: true, voteTimestamp: new Date() })
-    .where(eq(voterRegistrationsTable.id, voterId));
+    .where(eq(studentRecordsTable.id, studentId));
 
-  // Record each vote with a hash (preserving anonymity)
   const sessionToken = req.sessionID;
   for (const vote of votes) {
     const voteHash = crypto
@@ -162,13 +157,12 @@ router.post("/ballot/submit", async (req, res): Promise<void> => {
     });
   }
 
-  // Destroy session after voting
   req.session.destroy(() => {});
 
   await logAuditEvent({
     eventType: "vote_cast",
     description: `Vote cast for ${votes.length} offices`,
-    actorId: voter.matricNumber,
+    actorId: student.matricNumber,
     actorType: "student",
     ipAddress: undefined,
     metadata: JSON.stringify({ officeCount: votes.length }),

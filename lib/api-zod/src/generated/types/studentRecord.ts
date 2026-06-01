@@ -12,5 +12,5 @@ export interface StudentRecord {
   email: string;
   fullName: string;
   level: string;
-  isRegistered: boolean;
+  hasVoted: boolean;
 }

@@ -11,4 +11,5 @@ export type StudentRecordImportRecordsItem = {
   email: string;
   fullName: string;
   level: string;
+  personalCode?: string;
 };

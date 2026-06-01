@@ -886,9 +886,11 @@ components:
       properties:
         matricNumber:
           type: string
-        password:
+        email:
           type: string
-      required: [matricNumber, password]
+        personalCode:
+          type: string
+      required: [matricNumber, email, personalCode]
 
     VoterSession:
       type: object
@@ -1243,9 +1245,9 @@ components:
           type: string
         level:
           type: string
-        isRegistered:
+        hasVoted:
           type: boolean
-      required: [id, matricNumber, email, fullName, level, isRegistered]
+      required: [id, matricNumber, email, fullName, level, hasVoted]
 
     StudentRecordListResponse:
       type: object
@@ -1277,6 +1279,8 @@ components:
               fullName:
                 type: string
               level:
+                type: string
+              personalCode:
                 type: string
             required: [matricNumber, email, fullName, level]
       required: [records]

@@ -106,7 +106,8 @@ export interface RegistrationResult {
 
 export interface VoterLoginInput {
   matricNumber: string;
-  password: string;
+  email: string;
+  personalCode: string;
 }
 
 export interface VoterSession {
@@ -343,7 +344,7 @@ export interface StudentRecord {
   email: string;
   fullName: string;
   level: string;
-  isRegistered: boolean;
+  hasVoted: boolean;
 }
 
 export interface StudentRecordListResponse {
@@ -358,6 +359,7 @@ export type StudentRecordImportRecordsItem = {
   email: string;
   fullName: string;
   level: string;
+  personalCode?: string;
 };
 
 export interface StudentRecordImport {

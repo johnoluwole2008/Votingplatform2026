@@ -32,13 +32,17 @@ export const auditActorTypeEnum = pgEnum("audit_actor_type", [
   "system",
 ]);
 
-// ── Official student records (pre-loaded by admin for validation) ────────────
+// ── Official student records (pre-loaded by admin; serve as auth source) ─────
 export const studentRecordsTable = pgTable("student_records", {
   id: serial("id").primaryKey(),
   matricNumber: varchar("matric_number", { length: 50 }).notNull().unique(),
   email: text("email").notNull().unique(),
   fullName: text("full_name").notNull(),
   level: academicLevelEnum("level").notNull(),
+  personalCodeHash: text("personal_code_hash"),
+  hasVoted: boolean("has_voted").notNull().default(false),
+  voteTimestamp: timestamp("vote_timestamp", { withTimezone: true }),
+  ipAddress: text("ip_address"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -46,7 +50,7 @@ export const studentRecordsTable = pgTable("student_records", {
 
 export const insertStudentRecordSchema = createInsertSchema(
   studentRecordsTable,
-).omit({ id: true, createdAt: true });
+).omit({ id: true, createdAt: true, personalCodeHash: true, hasVoted: true, voteTimestamp: true, ipAddress: true });
 export type InsertStudentRecord = z.infer<typeof insertStudentRecordSchema>;
 export type StudentRecord = typeof studentRecordsTable.$inferSelect;
 

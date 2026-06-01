@@ -3,24 +3,23 @@ import AdminLayout from "@/components/admin-layout";
 import { useAdminSession } from "@/hooks/use-voter-session";
 import { useListStudentRecords, useImportStudentRecords } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Search, Upload, Loader2, Database, CheckCircle } from "lucide-react";
+import { Search, Upload, Loader2, Database, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
 
-const CSV_TEMPLATE = "matric_number,email,full_name,level\nPHA/2024/001,student001@faculty.edu,Full Student Name,100L\n";
+const CSV_TEMPLATE = "Name,Email,Matric Number,Level,Personal Code\nFull Student Name,student001@faculty.edu,PHA/2024/001,100L,MyCode123\n";
 
-function parseCsv(text: string): { matricNumber: string; email: string; fullName: string; level: string }[] {
+function parseCsv(text: string): { matricNumber: string; email: string; fullName: string; level: string; personalCode?: string }[] {
   const lines = text.trim().split("\n");
   if (lines.length < 2) return [];
   return lines.slice(1).flatMap((line) => {
     const parts = line.split(",").map((s) => s.trim().replace(/^"|"$/g, ""));
     if (parts.length < 4) return [];
-    const [matricNumber, email, fullName, level] = parts;
-    if (!matricNumber || !email || !fullName || !level) return [];
-    return [{ matricNumber, email, fullName, level }];
+    const [fullName, email, matricNumber, level, personalCode] = parts;
+    if (!fullName || !email || !matricNumber || !level) return [];
+    return [{ fullName, email, matricNumber, level, ...(personalCode ? { personalCode } : {}) }];
   });
 }
 
@@ -61,7 +60,7 @@ export default function AdminStudentsPage() {
       const text = evt.target?.result as string;
       const records = parseCsv(text);
       if (records.length === 0) {
-        toast({ title: "Import failed", description: "No valid records found in CSV.", variant: "destructive" });
+        toast({ title: "Import failed", description: "No valid records found in CSV. Check the format.", variant: "destructive" });
         return;
       }
 
@@ -125,8 +124,9 @@ export default function AdminStudentsPage() {
 
         {/* Info box */}
         <div className="bg-card border border-border rounded-lg p-4 mb-6 text-sm text-muted-foreground">
-          Student records are the <strong className="text-foreground">source of truth</strong> used to verify voter registrations.
-          Import your official student list here before opening registration. The CSV must have columns: <code className="text-xs bg-muted px-1 py-0.5 rounded">matric_number, email, full_name, level</code>.
+          Import your official student list here. Students log in with their <strong className="text-foreground">Matric Number</strong>, <strong className="text-foreground">Email</strong>, and <strong className="text-foreground">Personal Code</strong> — no registration needed.
+          The CSV must have columns in this order: <code className="text-xs bg-muted px-1 py-0.5 rounded">Name, Email, Matric Number, Level, Personal Code</code>.
+          Re-importing a record updates it in place.
         </div>
 
         {/* Filters */}
@@ -177,7 +177,8 @@ export default function AdminStudentsPage() {
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Full Name</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Level</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Email</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Registered?</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Has Code?</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Voted?</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -188,12 +189,17 @@ export default function AdminStudentsPage() {
                       <td className="px-4 py-3 text-muted-foreground">{s.level}</td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">{s.email}</td>
                       <td className="px-4 py-3">
-                        {s.isRegistered ? (
+                        <span className="text-xs text-muted-foreground">via import</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {s.hasVoted ? (
                           <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-medium">
-                            <CheckCircle className="h-3.5 w-3.5" /> Registered
+                            <CheckCircle className="h-3.5 w-3.5" /> Voted
                           </span>
                         ) : (
-                          <span className="text-xs text-muted-foreground">Not yet</span>
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <XCircle className="h-3.5 w-3.5" /> Not yet
+                          </span>
                         )}
                       </td>
                     </tr>

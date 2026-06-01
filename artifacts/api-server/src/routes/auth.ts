@@ -1,12 +1,10 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
   db,
   studentRecordsTable,
-  voterRegistrationsTable,
 } from "@workspace/db";
 import {
-  hashPassword,
   verifyPassword,
   isAccountLocked,
   recordLoginAttempt,
@@ -14,108 +12,9 @@ import {
 } from "../lib/auth";
 import { logAuditEvent } from "../lib/audit";
 import { getElectionPhase } from "../lib/election";
-import { RegisterVoterBody, LoginVoterBody } from "@workspace/api-zod";
+import { LoginVoterBody } from "@workspace/api-zod";
 
 const router = Router();
-
-// ── Register ─────────────────────────────────────────────────────────────────
-
-router.post("/auth/register", async (req, res): Promise<void> => {
-  const parsed = RegisterVoterBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
-
-  const { matricNumber, email, password, fullName, level } = parsed.data;
-  const ip = getClientIp(req);
-
-  const { registrationOpen } = await getElectionPhase();
-  if (!registrationOpen) {
-    res.status(403).json({ error: "Registration is not currently open." });
-    return;
-  }
-
-  // Validate matric-email pair against official records
-  const [record] = await db
-    .select()
-    .from(studentRecordsTable)
-    .where(eq(studentRecordsTable.matricNumber, matricNumber.toUpperCase()))
-    .limit(1);
-
-  if (!record) {
-    await logAuditEvent({
-      eventType: "registration_failed",
-      description: `Registration attempt with unknown matric number: ${matricNumber}`,
-      actorId: matricNumber,
-      actorType: "student",
-      ipAddress: ip,
-    });
-    res.status(400).json({
-      error: "Matric number not found in official student records.",
-    });
-    return;
-  }
-
-  if (record.email.toLowerCase() !== email.toLowerCase()) {
-    await logAuditEvent({
-      eventType: "registration_failed",
-      description: `Email-matric mismatch for matric number: ${matricNumber}`,
-      actorId: matricNumber,
-      actorType: "student",
-      ipAddress: ip,
-    });
-    res.status(400).json({
-      error:
-        "The email address does not match the one on record for this matric number.",
-    });
-    return;
-  }
-
-  // Check for duplicate registration
-  const [existing] = await db
-    .select({ id: voterRegistrationsTable.id })
-    .from(voterRegistrationsTable)
-    .where(eq(voterRegistrationsTable.matricNumber, matricNumber.toUpperCase()))
-    .limit(1);
-
-  if (existing) {
-    res.status(409).json({
-      error: "This matric number has already been registered.",
-    });
-    return;
-  }
-
-  const passwordHash = await hashPassword(password);
-
-  const [voter] = await db
-    .insert(voterRegistrationsTable)
-    .values({
-      matricNumber: matricNumber.toUpperCase(),
-      email: email.toLowerCase(),
-      fullName,
-      level: level as never,
-      passwordHash,
-      ipAddress: ip ?? null,
-    })
-    .returning();
-
-  await logAuditEvent({
-    eventType: "registration_success",
-    description: `Student ${fullName} (${matricNumber}) registered successfully`,
-    actorId: matricNumber,
-    actorType: "student",
-    ipAddress: ip,
-  });
-
-  res.status(201).json({
-    success: true,
-    message: "Registration successful. You can now vote on Election Day.",
-    matricNumber: voter.matricNumber,
-    fullName: voter.fullName,
-    level: voter.level,
-  });
-});
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 
@@ -126,7 +25,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
 
-  const { matricNumber, password } = parsed.data;
+  const { matricNumber, email, personalCode } = parsed.data;
   const ip = getClientIp(req);
 
   const { votingOpen } = await getElectionPhase();
@@ -143,60 +42,71 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
 
-  const [voter] = await db
+  const [student] = await db
     .select()
-    .from(voterRegistrationsTable)
+    .from(studentRecordsTable)
     .where(
-      eq(voterRegistrationsTable.matricNumber, matricNumber.toUpperCase()),
+      and(
+        eq(studentRecordsTable.matricNumber, matricNumber.toUpperCase()),
+        eq(studentRecordsTable.email, email.toLowerCase()),
+      ),
     )
     .limit(1);
 
-  if (!voter) {
+  if (!student) {
     await recordLoginAttempt(matricNumber.toUpperCase(), ip, false);
     await logAuditEvent({
       eventType: "login_failed",
-      description: `Failed login attempt — matric number not registered: ${matricNumber}`,
+      description: `Failed login — matric/email not found: ${matricNumber}`,
       actorId: matricNumber,
       actorType: "student",
       ipAddress: ip,
     });
-    res.status(401).json({ error: "Invalid matric number or password." });
+    res.status(401).json({ error: "Invalid matric number, email, or personal code." });
     return;
   }
 
-  const valid = await verifyPassword(password, voter.passwordHash);
+  if (!student.personalCodeHash) {
+    await recordLoginAttempt(matricNumber.toUpperCase(), ip, false);
+    res.status(401).json({
+      error: "No personal code set for this account. Contact the Electoral Committee.",
+    });
+    return;
+  }
+
+  const valid = await verifyPassword(personalCode, student.personalCodeHash);
   if (!valid) {
     await recordLoginAttempt(matricNumber.toUpperCase(), ip, false);
     await logAuditEvent({
       eventType: "login_failed",
-      description: `Failed login attempt for ${matricNumber}`,
+      description: `Failed login — wrong personal code for ${matricNumber}`,
       actorId: matricNumber,
       actorType: "student",
       ipAddress: ip,
     });
-    res.status(401).json({ error: "Invalid matric number or password." });
+    res.status(401).json({ error: "Invalid matric number, email, or personal code." });
     return;
   }
 
   await recordLoginAttempt(matricNumber.toUpperCase(), ip, true);
 
-  req.session.voterId = voter.id;
-  req.session.matricNumber = voter.matricNumber;
+  req.session.voterId = student.id;
+  req.session.matricNumber = student.matricNumber;
 
   await logAuditEvent({
     eventType: "login_success",
-    description: `Student ${voter.fullName} logged in`,
-    actorId: voter.matricNumber,
+    description: `Student ${student.fullName} logged in`,
+    actorId: student.matricNumber,
     actorType: "student",
     ipAddress: ip,
   });
 
   res.json({
-    id: voter.id,
-    matricNumber: voter.matricNumber,
-    fullName: voter.fullName,
-    level: voter.level,
-    hasVoted: voter.hasVoted,
+    id: student.id,
+    matricNumber: student.matricNumber,
+    fullName: student.fullName,
+    level: student.level,
+    hasVoted: student.hasVoted,
   });
 });
 
@@ -216,24 +126,24 @@ router.get("/auth/me", async (req, res): Promise<void> => {
     return;
   }
 
-  const [voter] = await db
+  const [student] = await db
     .select()
-    .from(voterRegistrationsTable)
-    .where(eq(voterRegistrationsTable.id, req.session.voterId))
+    .from(studentRecordsTable)
+    .where(eq(studentRecordsTable.id, req.session.voterId))
     .limit(1);
 
-  if (!voter) {
+  if (!student) {
     req.session.destroy(() => {});
     res.status(401).json({ error: "Session invalid" });
     return;
   }
 
   res.json({
-    id: voter.id,
-    matricNumber: voter.matricNumber,
-    fullName: voter.fullName,
-    level: voter.level,
-    hasVoted: voter.hasVoted,
+    id: student.id,
+    matricNumber: student.matricNumber,
+    fullName: student.fullName,
+    level: student.level,
+    hasVoted: student.hasVoted,
   });
 });
 
