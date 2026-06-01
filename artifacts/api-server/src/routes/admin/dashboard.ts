@@ -26,11 +26,11 @@ router.get("/admin/dashboard", async (req, res): Promise<void> => {
   const settings = await getOrCreateSettings();
   const { phase, registrationOpen, votingOpen } = await getElectionPhase();
 
-  const [totalRegistered] = await db
+  const totalRegisteredRows = await db
     .select({ count: count() })
     .from(voterRegistrationsTable);
 
-  const [totalVoted] = await db
+  const totalVotedRows = await db
     .select({ count: count() })
     .from(voterRegistrationsTable)
     .where(eq(voterRegistrationsTable.hasVoted, true));
@@ -54,8 +54,8 @@ router.get("/admin/dashboard", async (req, res): Promise<void> => {
     };
   });
 
-  const reg = Number((totalRegistered as unknown as Array<{ count: number }>)[0]?.count ?? 0);
-  const voted = Number((totalVoted as unknown as Array<{ count: number }>)[0]?.count ?? 0);
+  const reg = Number(totalRegisteredRows[0]?.count ?? 0);
+  const voted = Number(totalVotedRows[0]?.count ?? 0);
   const total = settings.totalExpectedVoters;
 
   res.json({

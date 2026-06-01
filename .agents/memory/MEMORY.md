@@ -1,0 +1,3 @@
+- [Session store setup](session-store.md) — connect-pg-simple needs the session table pre-created; never use createTableIfMissing (esbuild strips SQL assets)
+- [Orval hook options](orval-hook-options.md) — spread getXxxQueryOptions() (not .query) into the query override to satisfy required queryKey type
+- [Orval list hooks](orval-hook-options.md) — list hook params are the first positional arg, not inside an options object

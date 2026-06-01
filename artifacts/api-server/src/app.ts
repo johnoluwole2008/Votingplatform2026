@@ -51,7 +51,6 @@ app.use(
     store: new PgStore({
       pool: pool as never,
       tableName: "session",
-      createTableIfMissing: true,
     }),
     secret: process.env.SESSION_SECRET ?? "dev-secret-change-in-production",
     resave: false,
