@@ -92,14 +92,43 @@ router.post("/admin/email/test", async (req, res): Promise<void> => {
   if (!testEmail) { res.status(400).json({ error: "Provide a test email address." }); return; }
   try {
     const transporter = createTransporter({ host: cfg.host!, port: cfg.port, user: cfg.user!, pass: cfg.pass! });
-    await transporter.sendMail({
+
+    // Step 1: verify the connection before attempting to send
+    try {
+      await transporter.verify();
+    } catch (verifyErr: any) {
+      res.status(500).json({
+        error: `Connection failed: ${verifyErr.message}. Check your SMTP host, port, username, and password.`,
+      });
+      return;
+    }
+
+    // Step 2: send the test message
+    const info = await transporter.sendMail({
       from: `"${cfg.fromName}" <${cfg.from || cfg.user}>`,
       to: testEmail,
       subject: "PharmSci E-Voting — SMTP Test",
-      text: "This is a test email to confirm your SMTP settings are working correctly.",
-      html: "<p>This is a test email to confirm your SMTP settings are working correctly.</p>",
+      text: "This is a test email from the PharmSci E-Voting admin panel.\n\nIf you received this, your SMTP settings are working correctly.",
+      html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:8px">
+        <h2 style="color:#0f766e;margin-top:0">SMTP Test Successful</h2>
+        <p style="color:#374151">This is a test email from the <strong>PharmSci E-Voting</strong> admin panel.</p>
+        <p style="color:#374151">If you received this, your SMTP settings are configured correctly.</p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0">
+        <p style="color:#6b7280;font-size:12px">Sent from ${cfg.host}:${cfg.port}</p>
+      </div>`,
     });
-    res.json({ success: true, message: `Test email sent to ${testEmail}` });
+
+    // Step 3: check if the address was rejected by the SMTP server
+    const rejected: string[] = (info as any).rejected ?? [];
+    if (rejected.length > 0) {
+      res.status(500).json({ error: `SMTP server rejected the address: ${rejected.join(", ")}` });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: `Test email delivered to ${testEmail}. If it doesn't appear in a few minutes, check your spam/junk folder.`,
+    });
   } catch (err: any) {
     res.status(500).json({ error: `SMTP error: ${err.message}` });
   }
@@ -304,19 +333,103 @@ export async function sendVoterReceiptEmail(voter: {
   const electionName = settings.electionName ?? "Faculty Student Elections";
   const formattedTime = voter.voteTimestamp.toLocaleString("en-NG", { dateStyle: "full", timeStyle: "short" });
 
-  const subject = `Your voting receipt — ${electionName}`;
-  const body = `Dear ${voter.fullName},
+  const subject = `✅ Your voting receipt — ${electionName}`;
 
-This is to confirm that your vote has been successfully recorded in the ${electionName}.
+  const textBody = `Dear ${voter.fullName},
+
+Your vote has been successfully recorded in the ${electionName}.
 
 Matric Number: ${voter.matricNumber}
-Time of vote: ${formattedTime}
+Time of vote:  ${formattedTime}
 
-Your ballot is anonymous — no record links your identity to your specific choices.
+Your ballot is completely anonymous — no record links your identity to your specific choices.
 
-Thank you for participating!
+Thank you for participating in this election!
 
 — PharmSci E-Voting Team`;
+
+  const htmlBody = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px">
+    <tr><td align="center">
+      <table width="100%" style="max-width:520px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:#0f766e;padding:28px 32px;text-align:center">
+            <div style="font-size:32px;margin-bottom:8px">🗳️</div>
+            <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:600">Vote Confirmed</h1>
+            <p style="margin:6px 0 0;color:#99f6e4;font-size:14px">${electionName}</p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:32px">
+            <p style="margin:0 0 16px;color:#374151;font-size:15px">Dear <strong>${voter.fullName}</strong>,</p>
+            <p style="margin:0 0 24px;color:#374151;font-size:15px;line-height:1.6">
+              Your vote has been <strong style="color:#0f766e">successfully recorded</strong> in the ${electionName}.
+            </p>
+
+            <!-- Receipt box -->
+            <table width="100%" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:24px">
+              <tr>
+                <td style="padding:20px 24px">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em">Voting Receipt</p>
+                  <table width="100%" style="margin-top:12px">
+                    <tr>
+                      <td style="padding:6px 0;color:#6b7280;font-size:13px;width:40%">Matric Number</td>
+                      <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600">${voter.matricNumber}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;color:#6b7280;font-size:13px">Time of Vote</td>
+                      <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600">${formattedTime}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;color:#6b7280;font-size:13px">Status</td>
+                      <td style="padding:6px 0">
+                        <span style="display:inline-block;background:#dcfce7;color:#15803d;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px">Recorded ✓</span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Anonymity note -->
+            <table width="100%" style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;margin-bottom:24px">
+              <tr>
+                <td style="padding:14px 18px">
+                  <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5">
+                    🔒 <strong>Your ballot is anonymous.</strong> No record links your identity to your specific choices. Only you know who you voted for.
+                  </p>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0;color:#6b7280;font-size:14px;line-height:1.6">
+              Thank you for participating in this election. Your voice matters!
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f9fafb;padding:20px 32px;border-top:1px solid #e5e7eb;text-align:center">
+            <p style="margin:0;color:#9ca3af;font-size:12px">
+              — PharmSci E-Voting Team<br>
+              <span style="color:#d1d5db">Faculty of Pharmaceutical Sciences</span>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
 
   try {
     const transporter = createTransporter({ host: cfg.host!, port: cfg.port, user: cfg.user!, pass: cfg.pass! });
@@ -324,10 +437,11 @@ Thank you for participating!
       from: `"${cfg.fromName}" <${cfg.from || cfg.user}>`,
       to: `"${voter.fullName}" <${voter.email}>`,
       subject,
-      html: body.replace(/\n/g, "<br>"),
-      text: body,
+      html: htmlBody,
+      text: textBody,
     });
   } catch {
+    // Fire-and-forget — don't block vote submission if email fails
   }
 }
 
