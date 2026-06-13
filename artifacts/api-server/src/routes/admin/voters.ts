@@ -123,6 +123,40 @@ router.patch("/admin/voters/:id", async (req, res): Promise<void> => {
   });
 });
 
+router.patch("/admin/voters/:id/reset-code", async (req, res): Promise<void> => {
+  if (!requireEditor(req, res)) return;
+
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const { personalCode } = req.body;
+  if (!personalCode || typeof personalCode !== "string" || personalCode.trim().length < 4) {
+    res.status(400).json({ error: "Personal code must be at least 4 characters." });
+    return;
+  }
+
+  const { hashPassword } = await import("../../lib/auth");
+  const passwordHash = await hashPassword(personalCode.trim());
+
+  const [updated] = await db
+    .update(voterRegistrationsTable)
+    .set({ passwordHash, personalCode: personalCode.trim() })
+    .where(eq(voterRegistrationsTable.id, id))
+    .returning();
+
+  if (!updated) { res.status(404).json({ error: "Voter not found" }); return; }
+
+  await logAuditEvent({
+    eventType: "voter_record_edited",
+    description: `Admin reset personal code for voter ${updated.matricNumber}`,
+    actorId: String(req.session.adminId),
+    actorType: "admin",
+  });
+
+  res.json({ success: true, personalCode: personalCode.trim() });
+});
+
 router.delete("/admin/voters/:id", async (req, res): Promise<void> => {
   if (!requireEditor(req, res)) return;
 

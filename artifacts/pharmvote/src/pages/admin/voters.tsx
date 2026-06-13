@@ -3,7 +3,7 @@ import AdminLayout from "@/components/admin-layout";
 import { useAdminSession } from "@/hooks/use-voter-session";
 import { useListVoters, useDeleteVoter } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Search, Download, Trash2, Loader2, Users, Eye, EyeOff } from "lucide-react";
+import { Search, Download, Trash2, Loader2, Users, Eye, EyeOff, KeyRound, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +20,9 @@ export default function AdminVotersPage() {
   const [voted, setVoted] = useState("all");
   const [page, setPage] = useState(1);
   const [revealedCodes, setRevealedCodes] = useState<Set<number>>(new Set());
+  const [resettingId, setResettingId] = useState<number | null>(null);
+  const [newCode, setNewCode] = useState("");
+  const [resetSaving, setResetSaving] = useState(false);
 
   const toggleCode = (id: number) => {
     setRevealedCodes((prev) => {
@@ -27,6 +30,43 @@ export default function AdminVotersPage() {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  const startReset = (id: number) => {
+    setResettingId(id);
+    setNewCode("");
+  };
+
+  const cancelReset = () => {
+    setResettingId(null);
+    setNewCode("");
+  };
+
+  const handleResetCode = async (id: number) => {
+    if (newCode.trim().length < 4) {
+      toast({ title: "Code too short", description: "Must be at least 4 characters.", variant: "destructive" });
+      return;
+    }
+    setResetSaving(true);
+    try {
+      const res = await fetch(`/api/admin/voters/${id}/reset-code`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personalCode: newCode.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Failed to reset code");
+      }
+      queryClient.invalidateQueries({ queryKey: ["listVoters"] });
+      toast({ title: "Personal code updated", description: `Code has been reset successfully.` });
+      cancelReset();
+    } catch (err: any) {
+      toast({ title: "Reset failed", description: err.message, variant: "destructive" });
+    } finally {
+      setResetSaving(false);
+    }
   };
 
   const params = {
@@ -177,13 +217,54 @@ export default function AdminVotersPage() {
                       </td>
                       {!isObserver && (
                         <td className="px-4 py-3">
-                          <button
-                            onClick={() => handleDelete(v.id, v.fullName)}
-                            className="text-muted-foreground hover:text-destructive transition-colors"
-                            data-testid={`button-delete-voter-${v.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {resettingId === v.id ? (
+                            <div className="flex items-center gap-1.5">
+                              <Input
+                                className="h-7 w-28 text-xs px-2 font-mono"
+                                placeholder="New code"
+                                value={newCode}
+                                onChange={(e) => setNewCode(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleResetCode(v.id);
+                                  if (e.key === "Escape") cancelReset();
+                                }}
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => handleResetCode(v.id)}
+                                disabled={resetSaving}
+                                className="text-emerald-600 hover:text-emerald-700 transition-colors disabled:opacity-50"
+                                title="Save code"
+                              >
+                                {resetSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                              </button>
+                              <button
+                                onClick={cancelReset}
+                                className="text-muted-foreground hover:text-foreground transition-colors"
+                                title="Cancel"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => startReset(v.id)}
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                                title="Reset personal code"
+                                data-testid={`button-reset-code-${v.id}`}
+                              >
+                                <KeyRound className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(v.id, v.fullName)}
+                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                data-testid={`button-delete-voter-${v.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )}
                         </td>
                       )}
                     </tr>
