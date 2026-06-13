@@ -108,10 +108,14 @@ router.post("/admin/email/test", async (req, res): Promise<void> => {
 // GET /admin/email/jobs
 router.get("/admin/email/jobs", async (req, res): Promise<void> => {
   if (!req.session.adminId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const jobs = await db.execute(sql`
-    SELECT * FROM email_jobs ORDER BY created_at DESC LIMIT 50
-  `);
-  res.json({ jobs: jobs.rows });
+  try {
+    const jobs = await db.execute(sql`
+      SELECT * FROM email_jobs ORDER BY created_at DESC LIMIT 50
+    `);
+    res.json({ jobs: jobs.rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Failed to load email jobs." });
+  }
 });
 
 // POST /admin/email/send
@@ -125,25 +129,31 @@ router.post("/admin/email/send", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid recipient group." }); return;
   }
 
-  const isScheduled = scheduledAt && new Date(scheduledAt) > new Date();
+  try {
+    const isScheduled = scheduledAt && new Date(scheduledAt) > new Date();
 
-  const [job] = await db.execute(sql`
-    INSERT INTO email_jobs (subject, body, recipient_group, scheduled_at, status, created_by_admin_id)
-    VALUES (${subject}, ${body}, ${recipientGroup}, ${scheduledAt ? new Date(scheduledAt).toISOString() : null}, ${isScheduled ? "scheduled" : "pending"}, ${req.session.adminId})
-    RETURNING *
-  `) as any;
+    const result = await db.execute(sql`
+      INSERT INTO email_jobs (subject, body, recipient_group, scheduled_at, status, created_by_admin_id)
+      VALUES (${subject}, ${body}, ${recipientGroup}, ${scheduledAt ? new Date(scheduledAt).toISOString() : null}, ${isScheduled ? "scheduled" : "pending"}, ${req.session.adminId})
+      RETURNING *
+    `);
+    const job = (result.rows?.[0] ?? result) as any;
 
-  if (!isScheduled) {
-    sendEmailJob((job as any).rows?.[0] ?? job).catch((err) => console.error("Email job failed:", err));
+    if (!isScheduled) {
+      sendEmailJob(job).catch((err) => console.error("Email job failed:", err));
+    }
+
+    await logAuditEvent({
+      eventType: isScheduled ? "email_job_scheduled" : "email_job_queued",
+      description: `Bulk email ${isScheduled ? "scheduled" : "queued"}: "${subject}" → ${recipientGroup}`,
+      actorId: String(req.session.adminId), actorType: "admin",
+    });
+
+    res.json({ success: true, scheduled: isScheduled, message: isScheduled ? `Email scheduled for ${new Date(scheduledAt).toLocaleString()}` : "Email is being sent now." });
+  } catch (err: any) {
+    console.error("Email send error:", err);
+    res.status(500).json({ error: err?.message ?? "Failed to queue email job." });
   }
-
-  await logAuditEvent({
-    eventType: isScheduled ? "email_job_scheduled" : "email_job_queued",
-    description: `Bulk email ${isScheduled ? "scheduled" : "queued"}: "${subject}" → ${recipientGroup}`,
-    actorId: String(req.session.adminId), actorType: "admin",
-  });
-
-  res.json({ success: true, scheduled: isScheduled, message: isScheduled ? `Email scheduled for ${new Date(scheduledAt).toLocaleString()}` : "Email is being sent now." });
 });
 
 // POST /admin/email/notify-phase — sends a voting open/closed notification to registered voters
@@ -154,15 +164,16 @@ router.post("/admin/email/notify-phase", async (req, res): Promise<void> => {
     res.status(400).json({ error: "phase must be 'voting_open' or 'voting_closed'" }); return;
   }
 
-  const settings = await getOrCreateSettings() as any;
-  const electionName = settings.electionName ?? "Faculty Student Elections";
+  try {
+    const settings = await getOrCreateSettings() as any;
+    const electionName = settings.electionName ?? "Faculty Student Elections";
 
-  let subject: string;
-  let body: string;
+    let subject: string;
+    let body: string;
 
-  if (phase === "voting_open") {
-    subject = `🗳️ Voting is now open — ${electionName}`;
-    body = `Dear [Name],
+    if (phase === "voting_open") {
+      subject = `🗳️ Voting is now open — ${electionName}`;
+      body = `Dear [Name],
 
 Voting for the ${electionName} is now officially open!
 
@@ -172,40 +183,49 @@ https://${process.env.REPLIT_DEV_DOMAIN ?? "your-election-site.com"}/login
 Voting closes soon — every vote counts. Make your voice heard.
 
 — PharmSci E-Voting Team`;
-  } else {
-    subject = `Voting has closed — ${electionName}`;
-    body = `Dear [Name],
+    } else {
+      subject = `Voting has closed — ${electionName}`;
+      body = `Dear [Name],
 
 Voting for the ${electionName} has now closed. Thank you for participating in this election.
 
 Results will be announced soon.
 
 — PharmSci E-Voting Team`;
+    }
+
+    const result = await db.execute(sql`
+      INSERT INTO email_jobs (subject, body, recipient_group, scheduled_at, status, created_by_admin_id)
+      VALUES (${subject}, ${body}, 'registered_voters', null, 'pending', ${req.session.adminId})
+      RETURNING *
+    `);
+    const job = (result.rows?.[0] ?? result) as any;
+
+    sendEmailJob(job).catch((err) => console.error("Phase notification email job failed:", err));
+
+    await logAuditEvent({
+      eventType: "email_phase_notification",
+      description: `Phase notification sent: ${phase} → registered_voters`,
+      actorId: String(req.session.adminId), actorType: "admin",
+    });
+
+    res.json({ success: true, message: `Sending ${phase === "voting_open" ? "voting open" : "voting closed"} notification to all registered voters.` });
+  } catch (err: any) {
+    console.error("Notify-phase error:", err);
+    res.status(500).json({ error: err?.message ?? "Failed to send phase notification." });
   }
-
-  const [job] = await db.execute(sql`
-    INSERT INTO email_jobs (subject, body, recipient_group, scheduled_at, status, created_by_admin_id)
-    VALUES (${subject}, ${body}, 'registered_voters', null, 'pending', ${req.session.adminId})
-    RETURNING *
-  `) as any;
-
-  sendEmailJob((job as any).rows?.[0] ?? job).catch((err) => console.error("Phase notification email job failed:", err));
-
-  await logAuditEvent({
-    eventType: "email_phase_notification",
-    description: `Phase notification sent: ${phase} → registered_voters`,
-    actorId: String(req.session.adminId), actorType: "admin",
-  });
-
-  res.json({ success: true, message: `Sending ${phase === "voting_open" ? "voting open" : "voting closed"} notification to all registered voters.` });
 });
 
 // DELETE /admin/email/jobs/:id
 router.delete("/admin/email/jobs/:id", async (req, res): Promise<void> => {
   if (!requireEditor(req, res)) return;
-  const id = parseInt(req.params.id, 10);
-  await db.execute(sql`UPDATE email_jobs SET status = 'cancelled' WHERE id = ${id} AND status IN ('pending', 'scheduled')`);
-  res.json({ success: true });
+  try {
+    const id = parseInt(req.params.id, 10);
+    await db.execute(sql`UPDATE email_jobs SET status = 'cancelled' WHERE id = ${id} AND status IN ('pending', 'scheduled')`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Failed to cancel job." });
+  }
 });
 
 export async function sendEmailJob(job: any): Promise<void> {

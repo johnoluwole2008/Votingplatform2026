@@ -201,6 +201,22 @@ export const loginAttemptsTable = pgTable("login_attempts", {
     .defaultNow(),
 });
 
+// ── Email jobs (bulk email queue) ────────────────────────────────────────────
+export const emailJobsTable = pgTable("email_jobs", {
+  id: serial("id").primaryKey(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  recipientGroup: text("recipient_group").notNull().default("all_students"),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  status: text("status").notNull().default("pending"),
+  sentCount: integer("sent_count").notNull().default(0),
+  error: text("error"),
+  createdByAdminId: integer("created_by_admin_id").references(() => adminsTable.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type EmailJob = typeof emailJobsTable.$inferSelect;
+
 // ── Audit logs (append-only) ──────────────────────────────────────────────────
 export const auditLogsTable = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
