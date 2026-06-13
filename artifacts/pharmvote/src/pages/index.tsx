@@ -136,7 +136,7 @@ export default function IndexPage() {
               )}
               <div className="bg-card border border-border rounded-lg px-5 py-4 text-center" data-testid="status-students">
                 <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Eligible Students</div>
-                <div className="text-sm font-semibold text-foreground">{status.totalStudents.toLocaleString()} registered students</div>
+                <div className="text-sm font-semibold text-foreground">{(status.totalStudents ?? 0).toLocaleString()} registered students</div>
               </div>
             </div>
           )}
