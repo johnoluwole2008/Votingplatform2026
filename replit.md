@@ -52,10 +52,9 @@ A secure online student election platform for the Faculty of Pharmaceutical Scie
 
 ## Seeded demo data
 
-- **Admin:** `admin@pharmsci.edu.ng` / `Admin@12345` (super_admin)
-- **Voters (10 registered):** matric `PHA/2024/001`–`PHA/2024/010`, email `student1@pharmsci.edu.ng`–`student10@pharmsci.edu.ng`, password `Test@12345`
-- **Student records:** 30 sample records across 6 levels
-- **Election:** 5 offices, 11 candidates, voting currently open
+- **Admin:** `johnoluwole2008@gmail.com` / `Admin@123` (super_admin)
+- **Student records:** 30 demo records across 6 levels, matric `PHA/2024/001`–`PHA/2024/030`, email `student1@pharmsci.edu.ng`–`student30@pharmsci.edu.ng`, personal code `Test@12345`
+- **Election:** 17 offices, 58 candidates, voting currently open
 
 ## Gotchas
 
