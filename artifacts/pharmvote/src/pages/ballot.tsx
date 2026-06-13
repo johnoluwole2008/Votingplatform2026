@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useGetBallot, getGetBallotQueryOptions } from "@workspace/api-client-react";
 import { useVoterSession } from "@/hooks/use-voter-session";
-import { Loader2, Shield, CheckCircle, AlertCircle, ChevronRight, MinusCircle } from "lucide-react";
+import { Loader2, Shield, CheckCircle, AlertCircle, ChevronRight, MinusCircle, X, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -15,6 +15,14 @@ export default function BallotPage() {
   });
   const [selections, setSelections] = useState<Record<number, number>>({});
   const [abstained, setAbstained] = useState<Set<number>>(new Set());
+  const [expandedPhoto, setExpandedPhoto] = useState<{ url: string; name: string } | null>(null);
+
+  useEffect(() => {
+    if (!expandedPhoto) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setExpandedPhoto(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expandedPhoto]);
 
   if (session.isLoading || ballot.isLoading) {
     return (
@@ -57,13 +65,42 @@ export default function BallotPage() {
 
   const handleReview = () => {
     sessionStorage.setItem("ballot_selections", JSON.stringify(selections));
-    sessionStorage.setItem("ballot_offices", JSON.stringify(offices));
+    // Strip photoUrl (can be large base64) — review page only needs id/title/name/level
+    const slimOffices = offices.map((o) => ({
+      id: o.id,
+      title: o.title,
+      candidates: o.candidates.map((c) => ({ id: c.id, fullName: c.fullName, level: c.level ?? null })),
+    }));
+    sessionStorage.setItem("ballot_offices", JSON.stringify(slimOffices));
     sessionStorage.setItem("ballot_abstained", JSON.stringify([...abstained]));
     setLocation("/ballot/review");
   };
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Photo lightbox */}
+      {expandedPhoto && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setExpandedPhoto(null)}
+        >
+          <div className="relative max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setExpandedPhoto(null)}
+              className="absolute -top-10 right-0 text-white/80 hover:text-white transition-colors"
+              aria-label="Close"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <img
+              src={expandedPhoto.url}
+              alt={expandedPhoto.name}
+              className="w-full rounded-xl object-cover shadow-2xl"
+            />
+            <div className="mt-3 text-center text-white font-medium text-sm">{expandedPhoto.name}</div>
+          </div>
+        </div>
+      )}
       <header className="border-b border-border bg-card px-4 py-4 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -144,12 +181,21 @@ export default function BallotPage() {
                       >
                         {/* Photo or radio */}
                         {(candidate as any).photoUrl ? (
-                          <img
-                            src={(candidate as any).photoUrl}
-                            alt={candidate.fullName}
-                            className="h-10 w-10 rounded-full object-cover shrink-0 border-2 border-border"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                          />
+                          <div className="relative group shrink-0">
+                            <img
+                              src={(candidate as any).photoUrl}
+                              alt={candidate.fullName}
+                              className="h-10 w-10 rounded-full object-cover border-2 border-border cursor-zoom-in"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedPhoto({ url: (candidate as any).photoUrl, name: candidate.fullName });
+                              }}
+                            />
+                            <div className="absolute inset-0 rounded-full bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                              <ZoomIn className="h-3 w-3 text-white" />
+                            </div>
+                          </div>
                         ) : (
                           <div
                             className={cn(
