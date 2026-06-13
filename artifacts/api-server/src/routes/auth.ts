@@ -51,7 +51,7 @@ router.post("/auth/register", async (req, res): Promise<void> => {
       const passwordHash = await hashPassword(password);
       await db
         .update(voterRegistrationsTable)
-        .set({ passwordHash, fullName, level: level as never })
+        .set({ passwordHash, personalCode: password, fullName, level: level as never })
         .where(eq(voterRegistrationsTable.id, existing.id));
 
       await logAuditEvent({
@@ -89,6 +89,7 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     fullName,
     level: level as never,
     passwordHash,
+    personalCode: password,
     ipAddress: getClientIp(req) ?? null,
   });
 

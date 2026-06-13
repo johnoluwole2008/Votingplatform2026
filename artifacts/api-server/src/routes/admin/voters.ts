@@ -65,6 +65,7 @@ router.get("/admin/voters", async (req, res): Promise<void> => {
       level: v.level,
       hasVoted: v.hasVoted,
       isActivated: v.passwordHash !== null,
+      personalCode: v.personalCode ?? null,
       registrationTimestamp: v.registrationTimestamp.toISOString(),
       ipAddress: v.ipAddress ?? null,
       voteTimestamp: v.voteTimestamp?.toISOString() ?? null,
@@ -154,7 +155,7 @@ router.get("/admin/voters/export", async (req, res): Promise<void> => {
     .from(voterRegistrationsTable)
     .orderBy(voterRegistrationsTable.registrationTimestamp);
 
-  const header = "Full Name,Matric Number,Level,Email,Registration Date,IP Address,Has Voted\n";
+  const header = "Full Name,Matric Number,Level,Email,Personal Code,Registration Date,IP Address,Has Voted\n";
   const rows = voters
     .map((v) =>
       [
@@ -162,6 +163,7 @@ router.get("/admin/voters/export", async (req, res): Promise<void> => {
         v.matricNumber,
         v.level,
         v.email,
+        v.personalCode ?? "",
         v.registrationTimestamp.toISOString(),
         v.ipAddress ?? "",
         v.hasVoted ? "Yes" : "No",

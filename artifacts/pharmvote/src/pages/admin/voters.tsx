@@ -3,7 +3,7 @@ import AdminLayout from "@/components/admin-layout";
 import { useAdminSession } from "@/hooks/use-voter-session";
 import { useListVoters, useDeleteVoter } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Search, Download, Trash2, Loader2, Users } from "lucide-react";
+import { Search, Download, Trash2, Loader2, Users, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,6 +19,15 @@ export default function AdminVotersPage() {
   const [level, setLevel] = useState("all");
   const [voted, setVoted] = useState("all");
   const [page, setPage] = useState(1);
+  const [revealedCodes, setRevealedCodes] = useState<Set<number>>(new Set());
+
+  const toggleCode = (id: number) => {
+    setRevealedCodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const params = {
     page,
@@ -123,6 +132,7 @@ export default function AdminVotersPage() {
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Matric No.</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Level</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Email</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Personal Code</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Registered</th>
                     {!isObserver && <th className="px-4 py-3" />}
@@ -135,6 +145,24 @@ export default function AdminVotersPage() {
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{v.matricNumber}</td>
                       <td className="px-4 py-3 text-muted-foreground">{v.level}</td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">{v.email}</td>
+                      <td className="px-4 py-3">
+                        {(v as any).personalCode ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-xs text-foreground">
+                              {revealedCodes.has(v.id) ? (v as any).personalCode : "••••••••"}
+                            </span>
+                            <button
+                              onClick={() => toggleCode(v.id)}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                              title={revealedCodes.has(v.id) ? "Hide code" : "Reveal code"}
+                            >
+                              {revealedCodes.has(v.id) ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         {v.hasVoted ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Voted</span>
