@@ -70,7 +70,10 @@ export default function AdminLayout({ children, role }: AdminLayoutProps) {
           <img src="/logo.png" alt="PharmSci Logo" className="h-7 w-7 object-contain" />
           <span className="font-semibold text-sm text-sidebar-foreground">PharmSci Admin</span>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">Electoral Committee Portal</p>
+        <div className="flex items-center gap-1.5 mt-1">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Live — auto-refreshing</p>
+        </div>
       </div>
 
       <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">

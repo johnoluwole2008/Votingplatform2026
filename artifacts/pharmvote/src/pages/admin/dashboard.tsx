@@ -53,8 +53,8 @@ export default function AdminDashboardPage() {
   const stats = useGetDashboardStats({
     query: { ...getGetDashboardStatsQueryOptions(), refetchInterval: 15000 },
   });
-  const timeline = useGetTurnoutTimeline();
-  const preview = useGetResultsPreview();
+  const timeline = useGetTurnoutTimeline({ query: { refetchInterval: 30_000 } });
+  const preview = useGetResultsPreview({ query: { refetchInterval: 30_000 } });
   const queryClient = useQueryClient();
 
   const handleRefresh = () => {

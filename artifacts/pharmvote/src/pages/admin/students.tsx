@@ -117,11 +117,10 @@ export default function AdminStudentsPage() {
   const [level, setLevel] = useState("all");
   const [page, setPage] = useState(1);
 
-  const { data, isLoading } = useListStudentRecords({
-    page, limit: 50,
-    ...(search ? { search } : {}),
-    ...(level !== "all" ? { level } : {}),
-  });
+  const { data, isLoading } = useListStudentRecords(
+    { page, limit: 50, ...(search ? { search } : {}), ...(level !== "all" ? { level } : {}) },
+    { query: { refetchInterval: 60_000 } },
+  );
 
   const importRecords = useImportStudentRecords();
   const isObserver = session.data?.role === "observer";

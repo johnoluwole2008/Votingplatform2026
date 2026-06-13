@@ -46,11 +46,10 @@ export default function AdminAuditPage() {
   const [eventType, setEventType] = useState("all");
   const [page, setPage] = useState(1);
 
-  const { data, isLoading } = useListAuditLogs({
-    page,
-    limit: 50,
-    ...(eventType !== "all" ? { event: eventType } : {}),
-  });
+  const { data, isLoading } = useListAuditLogs(
+    { page, limit: 50, ...(eventType !== "all" ? { event: eventType } : {}) },
+    { query: { refetchInterval: 15_000 } },
+  );
 
   const handleExport = () => {
     window.location.href = "/api/admin/audit-logs/export";

@@ -32,7 +32,7 @@ type ViewMode = "bars" | "bar-chart" | "pie-chart";
 
 export default function AdminResultsPage() {
   const session = useAdminSession();
-  const { data, isLoading } = useGetElectionResults();
+  const { data, isLoading, dataUpdatedAt } = useGetElectionResults({ query: { refetchInterval: 10_000 } });
   const [viewMode, setViewMode] = useState<ViewMode>("bars");
 
   const handleExport = (format: "csv" | "pdf") => {
@@ -45,7 +45,17 @@ export default function AdminResultsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Election Results</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Live vote counts per office</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <p className="text-sm text-muted-foreground">
+                Live — refreshes every 10s
+                {dataUpdatedAt > 0 && (
+                  <span className="ml-1 text-xs">
+                    · updated {Math.round((Date.now() - dataUpdatedAt) / 1000)}s ago
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {/* View toggle */}

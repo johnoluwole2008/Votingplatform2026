@@ -77,7 +77,7 @@ export default function AdminVotersPage() {
     ...(voted !== "all" ? { voted: voted === "yes" ? "true" : "false" } : {}),
   };
 
-  const { data, isLoading } = useListVoters(params);
+  const { data, isLoading } = useListVoters(params, { query: { refetchInterval: 30_000 } });
   const deleteVoter = useDeleteVoter();
 
   const isObserver = session.data?.role === "observer";

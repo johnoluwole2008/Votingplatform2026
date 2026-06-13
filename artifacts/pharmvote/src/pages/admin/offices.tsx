@@ -65,7 +65,7 @@ export default function AdminOfficesPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const photoFileRef = useRef<HTMLInputElement>(null);
 
-  const { data: offices, isLoading } = useListOffices();
+  const { data: offices, isLoading } = useListOffices({ query: { refetchInterval: 60_000 } });
   const createOffice = useCreateOffice();
   const updateOffice = useUpdateOffice();
   const deleteOffice = useDeleteOffice();

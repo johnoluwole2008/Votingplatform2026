@@ -56,7 +56,7 @@ export default function AdminAccountsPage() {
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
 
-  const { data, isLoading } = useListAdminAccounts();
+  const { data, isLoading } = useListAdminAccounts({ query: { refetchInterval: 60_000 } });
   const createAccount = useCreateAdminAccount();
   const deleteAccount = useDeleteAdminAccount();
 

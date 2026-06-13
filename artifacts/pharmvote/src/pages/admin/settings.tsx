@@ -53,7 +53,7 @@ export default function AdminSettingsPage() {
   const session = useAdminSession();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data, isLoading } = useGetElectionSettings();
+  const { data, isLoading } = useGetElectionSettings({ query: { refetchInterval: 30_000 } });
   const updateSettings = useUpdateElectionSettings();
   const [copied, setCopied] = useState(false);
   const [emailPending, setEmailPending] = useState(false);
