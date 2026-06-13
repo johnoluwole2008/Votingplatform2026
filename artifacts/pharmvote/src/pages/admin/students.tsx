@@ -3,24 +3,117 @@ import AdminLayout from "@/components/admin-layout";
 import { useAdminSession } from "@/hooks/use-voter-session";
 import { useListStudentRecords, useImportStudentRecords } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Search, Upload, Loader2, Database, CheckCircle, XCircle } from "lucide-react";
+import { Search, Upload, Loader2, Database, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
-const CSV_TEMPLATE = "Name,Email,Matric Number,Level,Personal Code\nFull Student Name,student001@faculty.edu,PHA/2024/001,100L,MyCode123\n";
+const CSV_TEMPLATE =
+  "Full Name,Email,Matric Number,Level,Personal Code\n" +
+  "Ada Okonkwo,ada.okonkwo@students.uniben.edu.ng,PHA/2024/001,100L,MyCode123\n" +
+  "Emeka Nwosu,emeka.nwosu@students.uniben.edu.ng,24/214PNP/106,300L,Pass4567\n";
 
-function parseCsv(text: string): { matricNumber: string; email: string; fullName: string; level: string; personalCode?: string }[] {
-  const lines = text.trim().split("\n");
-  if (lines.length < 2) return [];
-  return lines.slice(1).flatMap((line) => {
-    const parts = line.split(",").map((s) => s.trim().replace(/^"|"$/g, ""));
-    if (parts.length < 4) return [];
-    const [fullName, email, matricNumber, level, personalCode] = parts;
-    if (!fullName || !email || !matricNumber || !level) return [];
-    return [{ fullName, email, matricNumber, level, ...(personalCode ? { personalCode } : {}) }];
-  });
+function parseRfc4180(text: string): string[][] {
+  const rows: string[][] = [];
+  const s = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  let i = 0;
+  while (i <= s.length) {
+    const row: string[] = [];
+    while (true) {
+      if (i >= s.length || s[i] === "\n") break;
+      if (s[i] === '"') {
+        i++;
+        let field = "";
+        while (i < s.length) {
+          if (s[i] === '"' && s[i + 1] === '"') { field += '"'; i += 2; }
+          else if (s[i] === '"') { i++; break; }
+          else { field += s[i++]; }
+        }
+        row.push(field);
+      } else {
+        let field = "";
+        while (i < s.length && s[i] !== "," && s[i] !== "\n") field += s[i++];
+        row.push(field.trim());
+      }
+      if (i < s.length && s[i] === ",") { i++; }
+      else break;
+    }
+    if (i < s.length && s[i] === "\n") i++;
+    else if (i > s.length) break;
+    if (row.length > 0 && row.some((f) => f.length > 0)) rows.push(row);
+    if (i >= s.length) break;
+  }
+  return rows;
+}
+
+function normalizeLevel(raw: string): string {
+  const s = raw.trim().toUpperCase().replace(/\s+/g, "");
+  if (/^\d{3}L$/.test(s)) return s;
+  if (/^\d{3}$/.test(s)) {
+    const n = parseInt(s, 10);
+    if ([100, 200, 300, 400, 500, 600].includes(n)) return n + "L";
+  }
+  const m = s.match(/(\d{3})/);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    if ([100, 200, 300, 400, 500, 600].includes(n)) return n + "L";
+  }
+  if (/^[1-6]$/.test(s)) return parseInt(s, 10) * 100 + "L";
+  return raw.trim();
+}
+
+function detectColIdx(headers: string[], candidates: string[]): number {
+  const normalized = headers.map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ""));
+  for (const c of candidates) {
+    const cn = c.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const idx = normalized.findIndex((h) => h.includes(cn) || cn.includes(h));
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+type ParsedRecord = { fullName: string; email: string; matricNumber: string; level: string; personalCode?: string };
+
+function parseCsv(text: string): { records: ParsedRecord[]; skipped: number; headerMap: Record<string, number> } {
+  const rows = parseRfc4180(text);
+  if (rows.length < 2) return { records: [], skipped: 0, headerMap: {} };
+
+  const headers = rows[0];
+  const nameIdx = detectColIdx(headers, ["fullname", "name", "studentname", "candidate"]);
+  const emailIdx = detectColIdx(headers, ["email", "emailaddress", "mail"]);
+  const matricIdx = detectColIdx(headers, ["matric", "matricnumber", "matricno", "studentid", "regnum", "registration"]);
+  const levelIdx = detectColIdx(headers, ["level", "academiclevel", "class", "year"]);
+  const codeIdx = detectColIdx(headers, ["personalcode", "code", "password", "pin", "accesscode", "passphrase"]);
+
+  const fi = nameIdx !== -1 ? nameIdx : 0;
+  const ei = emailIdx !== -1 ? emailIdx : 1;
+  const mi = matricIdx !== -1 ? matricIdx : 2;
+  const li = levelIdx !== -1 ? levelIdx : 3;
+
+  const validLevels = ["100L", "200L", "300L", "400L", "500L", "600L"];
+  const records: ParsedRecord[] = [];
+  let skipped = 0;
+
+  for (const parts of rows.slice(1)) {
+    const fullName = parts[fi]?.trim() ?? "";
+    const email = parts[ei]?.trim() ?? "";
+    const matricNumber = (parts[mi]?.trim() ?? "").toUpperCase();
+    const rawLevel = parts[li]?.trim() ?? "";
+    const personalCode = codeIdx !== -1 ? parts[codeIdx]?.trim() : undefined;
+
+    if (!fullName || !email || !matricNumber || !rawLevel) { skipped++; continue; }
+    const level = normalizeLevel(rawLevel);
+    if (!validLevels.includes(level)) { skipped++; continue; }
+
+    records.push({ fullName, email, matricNumber, level, ...(personalCode && personalCode.length > 0 ? { personalCode } : {}) });
+  }
+
+  return {
+    records,
+    skipped,
+    headerMap: { name: fi, email: ei, matric: mi, level: li, code: codeIdx },
+  };
 }
 
 export default function AdminStudentsPage() {
@@ -58,9 +151,14 @@ export default function AdminStudentsPage() {
     const reader = new FileReader();
     reader.onload = (evt) => {
       const text = evt.target?.result as string;
-      const records = parseCsv(text);
+      const { records, skipped } = parseCsv(text);
+
       if (records.length === 0) {
-        toast({ title: "Import failed", description: "No valid records found in CSV. Check the format.", variant: "destructive" });
+        toast({
+          title: "No valid records found",
+          description: `${skipped} row(s) were skipped. Check that columns include: Name, Email, Matric Number, Level. Level values like "100", "200 Level", "300L" are all accepted.`,
+          variant: "destructive",
+        });
         return;
       }
 
@@ -69,13 +167,16 @@ export default function AdminStudentsPage() {
         {
           onSuccess: (result: any) => {
             queryClient.invalidateQueries({ queryKey: ["listStudentRecords"] });
-            toast({
-              title: "Import complete",
-              description: `Imported ${result.imported} records${result.errors > 0 ? `, ${result.errors} errors` : ""}.`,
-            });
+            const desc =
+              `Imported ${result.imported} records` +
+              (skipped > 0 ? `, ${skipped} rows skipped (missing/invalid fields)` : "") +
+              (result.errors > 0 ? `, ${result.errors} DB errors` : "") +
+              ".";
+            toast({ title: "Import complete", description: desc });
           },
-          onError: () => {
-            toast({ title: "Import failed", variant: "destructive" });
+          onError: (err: any) => {
+            const msg = err?.response?.data?.error ?? "Import failed";
+            toast({ title: "Import failed", description: msg, variant: "destructive" });
           },
         },
       );
@@ -105,7 +206,7 @@ export default function AdminStudentsPage() {
                   size="sm"
                   asChild
                   disabled={importRecords.isPending}
-                  data-testid="button-import"
+                  data-testid="button-import-csv"
                 >
                   <span className="cursor-pointer">
                     {importRecords.isPending ? (
@@ -116,34 +217,47 @@ export default function AdminStudentsPage() {
                     Import CSV
                   </span>
                 </Button>
-                <input type="file" accept=".csv" className="hidden" onChange={handleImportCsv} />
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={handleImportCsv}
+                  disabled={importRecords.isPending}
+                />
               </label>
             </div>
           )}
         </div>
 
-        {/* Info box */}
-        <div className="bg-card border border-border rounded-lg p-4 mb-6 text-sm text-muted-foreground">
-          Import your official student list here. Students log in with their <strong className="text-foreground">Matric Number</strong>, <strong className="text-foreground">Email</strong>, and <strong className="text-foreground">Personal Code</strong> — no registration needed.
-          The CSV must have columns in this order: <code className="text-xs bg-muted px-1 py-0.5 rounded">Name, Email, Matric Number, Level, Personal Code</code>.
-          Re-importing a record updates it in place.
-        </div>
+        {/* CSV import tips */}
+        {!isObserver && (
+          <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 mb-6 text-sm">
+            <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+            <div className="text-muted-foreground">
+              <span className="font-medium text-foreground">CSV Import Tips:</span>
+              {" "}Headers are auto-detected — column order doesn't matter.
+              Level values like <code className="text-xs bg-muted px-1 rounded">100</code>, <code className="text-xs bg-muted px-1 rounded">200 Level</code>, <code className="text-xs bg-muted px-1 rounded">300L</code> are all accepted.
+              Matric formats like <code className="text-xs bg-muted px-1 rounded">PHA/2024/001</code> or <code className="text-xs bg-muted px-1 rounded">24/214PNP/106</code> both work.
+              Google Forms exports are supported.
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-3 mb-5">
-          <div className="relative flex-1 min-w-48">
+        <div className="flex gap-3 mb-6">
+          <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search name or matric..."
-              className="pl-9"
+              placeholder="Search by name or matric number..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              className="pl-9"
               data-testid="input-search"
             />
           </div>
           <Select value={level} onValueChange={(v) => { setLevel(v); setPage(1); }}>
-            <SelectTrigger className="w-36" data-testid="select-level">
-              <SelectValue placeholder="All Levels" />
+            <SelectTrigger className="w-36" data-testid="select-level-filter">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Levels</SelectItem>
@@ -163,62 +277,60 @@ export default function AdminStudentsPage() {
           ) : !data || data.students.length === 0 ? (
             <div className="py-16 text-center text-muted-foreground">
               <Database className="h-8 w-8 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">No student records yet.</p>
-              {!isObserver && (
-                <p className="text-xs mt-1">Import a CSV file to populate the student list.</p>
-              )}
+              <p className="text-sm">{search || level !== "all" ? "No students match your filters." : "No student records yet. Import a CSV to get started."}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
               <table className="w-full text-sm">
                 <thead className="border-b border-border bg-muted/30">
                   <tr>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Matric No.</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Full Name</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Level</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Name</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Matric Number</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Email</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Has Code?</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Voted?</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Level</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Voted</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {data.students.map((s) => (
-                    <tr key={s.id} className="hover:bg-muted/20 transition-colors" data-testid={`student-row-${s.id}`}>
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{s.matricNumber}</td>
+                  {data.students.map((s: any) => (
+                    <tr key={s.id} className="hover:bg-muted/20" data-testid={`student-row-${s.id}`}>
                       <td className="px-4 py-3 font-medium text-foreground">{s.fullName}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{s.level}</td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs">{s.email}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{s.matricNumber}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{s.email}</td>
                       <td className="px-4 py-3">
-                        <span className="text-xs text-muted-foreground">via import</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">{s.level}</span>
                       </td>
                       <td className="px-4 py-3">
                         {s.hasVoted ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-medium">
-                            <CheckCircle className="h-3.5 w-3.5" /> Voted
-                          </span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Voted</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <XCircle className="h-3.5 w-3.5" /> Not yet
-                          </span>
+                          <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+
+              {/* Pagination */}
+              {data.total > 50 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/10">
+                  <p className="text-xs text-muted-foreground">
+                    Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, data.total)} of {data.total}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+                      Previous
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={page * 50 >= data.total} onClick={() => setPage((p) => p + 1)}>
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
-
-        {data && data.total > data.limit && (
-          <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
-            <span>Showing {(page - 1) * data.limit + 1}–{Math.min(page * data.limit, data.total)} of {data.total}</span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page === 1}>Previous</Button>
-              <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page * data.limit >= data.total}>Next</Button>
-            </div>
-          </div>
-        )}
       </div>
     </AdminLayout>
   );

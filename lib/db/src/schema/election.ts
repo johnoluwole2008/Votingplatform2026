@@ -89,6 +89,23 @@ export const adminsTable = pgTable("admins", {
 
 export type Admin = typeof adminsTable.$inferSelect;
 
+// ── Admin invite tokens ───────────────────────────────────────────────────────
+export const adminInviteTokensTable = pgTable("admin_invite_tokens", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  role: adminRoleEnum("role").notNull().default("observer"),
+  createdByAdminId: integer("created_by_admin_id").references(() => adminsTable.id),
+  email: text("email"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  usedByEmail: text("used_by_email"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type AdminInviteToken = typeof adminInviteTokensTable.$inferSelect;
+
 // ── Voter registrations ───────────────────────────────────────────────────────
 export const voterRegistrationsTable = pgTable("voter_registrations", {
   id: serial("id").primaryKey(),

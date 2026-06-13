@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,7 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, Save, AlertCircle } from "lucide-react";
+import { Loader2, Save, AlertCircle, Link2, Copy, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const schema = z.object({
@@ -38,8 +38,19 @@ export default function AdminSettingsPage() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useGetElectionSettings();
   const updateSettings = useUpdateElectionSettings();
+  const [copied, setCopied] = useState(false);
 
   const isObserver = session.data?.role === "observer";
+
+  const registrationUrl = `${window.location.origin}${import.meta.env.BASE_URL}register`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(registrationUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({ title: "Link copied!", description: "Registration link copied to clipboard." });
+    });
+  };
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -101,6 +112,29 @@ export default function AdminSettingsPage() {
         <p className="text-sm text-muted-foreground mb-8">
           Configure election schedule, name, and display options.
         </p>
+
+        {/* Registration Link Card */}
+        <div className="bg-card border border-border rounded-xl p-5 mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <Link2 className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Voter Registration Link</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Share this link with students so they can register to vote. Send it via email, WhatsApp, or your LMS.
+          </p>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-muted rounded-lg px-3 py-2 text-sm font-mono text-muted-foreground truncate border border-border">
+              {registrationUrl}
+            </div>
+            <Button variant="outline" size="sm" onClick={handleCopy} className="shrink-0">
+              {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+              {copied ? "Copied!" : "Copy"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Students will need their official matric number and school email to register.
+          </p>
+        </div>
 
         {isObserver && (
           <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm mb-6">

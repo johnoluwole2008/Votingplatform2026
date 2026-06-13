@@ -17,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, Trash2, Vote, ChevronDown, ChevronUp, UserPlus, Pencil, Check, X } from "lucide-react";
+import { Loader2, Plus, Trash2, Vote, ChevronDown, ChevronUp, UserPlus, Pencil, Check, X, ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const officeSchema = z.object({
@@ -30,6 +30,7 @@ const candidateSchema = z.object({
   fullName: z.string().min(2, "Candidate name required"),
   bio: z.string().optional(),
   level: z.string().optional(),
+  photoUrl: z.string().url("Enter a valid URL").optional().or(z.literal("")),
   officeId: z.number(),
 });
 
@@ -48,7 +49,7 @@ interface OfficeWithCandidates {
   title: string;
   description?: string | null;
   displayOrder: number;
-  candidates: { id: number; fullName: string; bio?: string | null; level?: string | null }[];
+  candidates: { id: number; fullName: string; bio?: string | null; level?: string | null; photoUrl?: string | null }[];
 }
 
 export default function AdminOfficesPage() {
@@ -81,7 +82,7 @@ export default function AdminOfficesPage() {
 
   const candidateForm = useForm<CandidateFormData>({
     resolver: zodResolver(candidateSchema),
-    defaultValues: { fullName: "", bio: "", level: "", officeId: 0 },
+    defaultValues: { fullName: "", bio: "", level: "", photoUrl: "", officeId: 0 },
   });
 
   const handleCreateOffice = (data: OfficeFormData) => {
@@ -139,7 +140,15 @@ export default function AdminOfficesPage() {
 
   const handleCreateCandidate = (data: CandidateFormData) => {
     createCandidate.mutate(
-      { data: { officeId: data.officeId, fullName: data.fullName, bio: data.bio, level: data.level } },
+      {
+        data: {
+          officeId: data.officeId,
+          fullName: data.fullName,
+          bio: data.bio,
+          level: data.level,
+          photoUrl: data.photoUrl || undefined,
+        },
+      },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["listOffices"] });
@@ -318,15 +327,29 @@ export default function AdminOfficesPage() {
                   <div className="border-t border-border">
                     {office.candidates.map((c) => (
                       <div key={c.id} className="flex items-center justify-between px-5 py-3 border-b border-border last:border-0" data-testid={`candidate-card-${c.id}`}>
-                        <div>
-                          <div className="text-sm font-medium text-foreground">{c.fullName}</div>
-                          {c.level && <div className="text-xs text-muted-foreground">{c.level}</div>}
-                          {c.bio && <div className="text-xs text-muted-foreground line-clamp-1">{c.bio}</div>}
+                        <div className="flex items-center gap-3 min-w-0">
+                          {c.photoUrl ? (
+                            <img
+                              src={c.photoUrl}
+                              alt={c.fullName}
+                              className="h-9 w-9 rounded-full object-cover shrink-0 border border-border"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                            />
+                          ) : (
+                            <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
+                              <ImageIcon className="h-4 w-4 text-muted-foreground opacity-50" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-foreground">{c.fullName}</div>
+                            {c.level && <div className="text-xs text-muted-foreground">{c.level}</div>}
+                            {c.bio && <div className="text-xs text-muted-foreground line-clamp-1">{c.bio}</div>}
+                          </div>
                         </div>
                         {!isObserver && (
                           <button
                             onClick={() => handleDeleteCandidate(c.id, c.fullName)}
-                            className="text-muted-foreground hover:text-destructive p-1 transition-colors"
+                            className="text-muted-foreground hover:text-destructive p-1 transition-colors shrink-0"
                             data-testid={`button-delete-candidate-${c.id}`}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -361,7 +384,20 @@ export default function AdminOfficesPage() {
                               <FormField control={candidateForm.control} name="bio" render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-xs">Bio (optional)</FormLabel>
-                                  <FormControl><Input {...field} placeholder="Brief bio" /></FormControl>
+                                  <FormControl><Input {...field} placeholder="Brief bio or tagline" /></FormControl>
+                                </FormItem>
+                              )} />
+                              <FormField control={candidateForm.control} name="photoUrl" render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs flex items-center gap-1.5">
+                                    <ImageIcon className="h-3 w-3" />
+                                    Photo URL (optional)
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input {...field} placeholder="https://example.com/photo.jpg" />
+                                  </FormControl>
+                                  <p className="text-xs text-muted-foreground">Paste a public image URL. Will be shown on the ballot.</p>
+                                  <FormMessage />
                                 </FormItem>
                               )} />
                               <div className="flex gap-2">

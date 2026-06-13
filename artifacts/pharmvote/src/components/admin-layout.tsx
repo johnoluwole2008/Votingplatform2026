@@ -18,6 +18,7 @@ import {
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -91,7 +92,11 @@ export default function AdminLayout({ children, role }: AdminLayoutProps) {
         })}
       </nav>
 
-      <div className="px-3 py-4 border-t border-sidebar-border">
+      <div className="px-3 py-4 border-t border-sidebar-border space-y-1">
+        <div className="flex items-center justify-between px-3 py-1">
+          <span className="text-xs text-muted-foreground">Theme</span>
+          <ThemeToggle />
+        </div>
         <Button
           variant="ghost"
           size="sm"
@@ -139,10 +144,11 @@ export default function AdminLayout({ children, role }: AdminLayoutProps) {
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1">
             <ShieldCheck className="h-4 w-4 text-primary" />
             <span className="font-semibold text-sm">PharmSci Admin</span>
           </div>
+          <ThemeToggle />
         </div>
 
         <main className="flex-1 overflow-auto">{children}</main>

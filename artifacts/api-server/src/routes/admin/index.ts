@@ -8,6 +8,7 @@ import auditRouter from "./audit";
 import settingsRouter from "./settings";
 import accountsRouter from "./accounts";
 import studentsRouter from "./students";
+import invitesRouter from "./invites";
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use(auditRouter);
 router.use(settingsRouter);
 router.use(accountsRouter);
 router.use(studentsRouter);
+router.use(invitesRouter);
 
 export default router;

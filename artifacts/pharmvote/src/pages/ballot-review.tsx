@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import { useSubmitBallot } from "@workspace/api-client-react";
-import { Shield, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
+import { Shield, AlertTriangle, CheckCircle, Loader2, MinusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -19,6 +19,7 @@ export default function BallotReviewPage() {
 
   const selectionsRaw = sessionStorage.getItem("ballot_selections");
   const officesRaw = sessionStorage.getItem("ballot_offices");
+  const abstainedRaw = sessionStorage.getItem("ballot_abstained");
 
   if (!selectionsRaw || !officesRaw) {
     setLocation("/ballot");
@@ -27,6 +28,8 @@ export default function BallotReviewPage() {
 
   const selections: Record<number, number> = JSON.parse(selectionsRaw);
   const offices: OfficeData[] = JSON.parse(officesRaw);
+  const abstainedIds: number[] = abstainedRaw ? JSON.parse(abstainedRaw) : [];
+  const abstainedSet = new Set(abstainedIds);
 
   const votes = Object.entries(selections).map(([officeId, candidateId]) => ({
     officeId: Number(officeId),
@@ -40,6 +43,7 @@ export default function BallotReviewPage() {
         onSuccess: () => {
           sessionStorage.removeItem("ballot_selections");
           sessionStorage.removeItem("ballot_offices");
+          sessionStorage.removeItem("ballot_abstained");
           setLocation("/ballot/success");
         },
         onError: (err: any) => {
@@ -66,29 +70,51 @@ export default function BallotReviewPage() {
         </p>
 
         {/* Warning */}
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8 text-sm">
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8 text-sm dark:bg-amber-950/20 dark:border-amber-800">
           <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-          <div className="text-amber-800">
+          <div className="text-amber-800 dark:text-amber-400">
             <strong>This is your final ballot.</strong> After submission, you will be logged out and your session will end.
           </div>
         </div>
+
+        {abstainedIds.length > 0 && (
+          <div className="flex items-start gap-3 bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6 text-sm dark:bg-orange-950/20 dark:border-orange-800">
+            <MinusCircle className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
+            <div className="text-orange-700 dark:text-orange-400">
+              You are <strong>abstaining</strong> from {abstainedIds.length} office{abstainedIds.length !== 1 ? "s" : ""}. No vote will be cast for those positions.
+            </div>
+          </div>
+        )}
 
         {/* Selections */}
         <div className="space-y-4 mb-10">
           {offices.map((office) => {
             const candidateId = selections[office.id];
             const candidate = office.candidates.find((c) => c.id === candidateId);
+            const isAbstained = abstainedSet.has(office.id);
             return (
               <div key={office.id} className="bg-card border border-border rounded-lg overflow-hidden" data-testid={`review-office-${office.id}`}>
                 <div className="px-4 py-2 bg-muted/30 border-b border-border">
                   <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{office.title}</div>
                 </div>
                 <div className="px-4 py-3 flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0" />
-                  <div>
-                    <div className="font-semibold text-foreground text-sm">{candidate?.fullName ?? "Unknown"}</div>
-                    {candidate?.level && <div className="text-xs text-muted-foreground">{candidate.level}</div>}
-                  </div>
+                  {isAbstained ? (
+                    <>
+                      <MinusCircle className="h-5 w-5 text-orange-400 shrink-0" />
+                      <div>
+                        <div className="font-semibold text-orange-600 dark:text-orange-400 text-sm">Abstained</div>
+                        <div className="text-xs text-muted-foreground">No vote cast for this office</div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0" />
+                      <div>
+                        <div className="font-semibold text-foreground text-sm">{candidate?.fullName ?? "Unknown"}</div>
+                        {candidate?.level && <div className="text-xs text-muted-foreground">{candidate.level}</div>}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             );

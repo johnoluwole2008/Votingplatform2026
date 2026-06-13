@@ -111,30 +111,22 @@ router.post("/ballot/submit", async (req, res): Promise<void> => {
     return;
   }
 
-  const offices = await db.select().from(officesTable);
-  const officeIds = offices.map((o) => o.id);
   const { votes } = parsed.data;
 
-  const votedOfficeIds = votes.map((v) => v.officeId);
-  const missingOffices = officeIds.filter((id) => !votedOfficeIds.includes(id));
-  if (missingOffices.length > 0) {
-    res.status(400).json({
-      error: "You must cast a vote for every office on the ballot.",
-    });
-    return;
-  }
+  // Validate that each provided vote references a valid candidate for that office
+  if (votes.length > 0) {
+    const candidateIds = votes.map((v) => v.candidateId);
+    const validCandidates = await db
+      .select()
+      .from(candidatesTable)
+      .where(inArray(candidatesTable.id, candidateIds));
 
-  const candidateIds = votes.map((v) => v.candidateId);
-  const validCandidates = await db
-    .select()
-    .from(candidatesTable)
-    .where(inArray(candidatesTable.id, candidateIds));
-
-  for (const vote of votes) {
-    const candidate = validCandidates.find((c) => c.id === vote.candidateId);
-    if (!candidate || candidate.officeId !== vote.officeId) {
-      res.status(400).json({ error: "Invalid ballot — candidate mismatch." });
-      return;
+    for (const vote of votes) {
+      const candidate = validCandidates.find((c) => c.id === vote.candidateId);
+      if (!candidate || candidate.officeId !== vote.officeId) {
+        res.status(400).json({ error: "Invalid ballot — candidate mismatch." });
+        return;
+      }
     }
   }
 
@@ -161,7 +153,7 @@ router.post("/ballot/submit", async (req, res): Promise<void> => {
 
   await logAuditEvent({
     eventType: "vote_cast",
-    description: `Vote cast for ${votes.length} offices`,
+    description: `Vote cast for ${votes.length} offices (${votes.length} voted, abstained from rest)`,
     actorId: student.matricNumber,
     actorType: "student",
     ipAddress: undefined,

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Trash2, UserPlus, UserCog, Shield, KeyRound, Eye, EyeOff } from "lucide-react";
+import { Loader2, Trash2, UserPlus, UserCog, Shield, KeyRound, Eye, EyeOff, Link2, Copy, Check, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +48,13 @@ export default function AdminAccountsPage() {
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteRole, setInviteRole] = useState<string>("observer");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [isCreatingInvite, setIsCreatingInvite] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
 
   const { data, isLoading } = useListAdminAccounts();
   const createAccount = useCreateAdminAccount();
@@ -122,6 +129,43 @@ export default function AdminAccountsPage() {
     }
   };
 
+  const handleCreateInvite = async () => {
+    setIsCreatingInvite(true);
+    try {
+      const res = await fetch("/api/admin/invites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ role: inviteRole, email: inviteEmail || undefined }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed to create invite");
+      const url = `${window.location.origin}${import.meta.env.BASE_URL}admin/join/${json.token}`;
+      setInviteUrl(url);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsCreatingInvite(false);
+    }
+  };
+
+  const handleCopyInvite = () => {
+    if (!inviteUrl) return;
+    navigator.clipboard.writeText(inviteUrl).then(() => {
+      setCopiedInvite(true);
+      setTimeout(() => setCopiedInvite(false), 2000);
+      toast({ title: "Link copied!", description: "Invite link copied to clipboard." });
+    });
+  };
+
+  const handleInviteClose = () => {
+    setInviteOpen(false);
+    setInviteUrl(null);
+    setInviteEmail("");
+    setInviteRole("observer");
+    setCopiedInvite(false);
+  };
+
   return (
     <AdminLayout role={session.data?.role}>
       <div className="px-6 py-8 max-w-3xl">
@@ -131,10 +175,16 @@ export default function AdminAccountsPage() {
             <p className="text-sm text-muted-foreground mt-0.5">Manage electoral committee portal access</p>
           </div>
           {isSuperAdmin && (
-            <Button size="sm" onClick={() => setShowForm((s) => !s)} data-testid="button-new-account">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Add Account
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)} data-testid="button-send-invite">
+                <Send className="h-4 w-4 mr-2" />
+                Invite Link
+              </Button>
+              <Button size="sm" onClick={() => setShowForm((s) => !s)} data-testid="button-new-account">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add Account
+              </Button>
+            </div>
           )}
         </div>
 
@@ -270,6 +320,79 @@ export default function AdminAccountsPage() {
           )}
         </div>
       </div>
+
+      {/* Invite Link dialog */}
+      <Dialog open={inviteOpen} onOpenChange={(open) => { if (!open) handleInviteClose(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-primary" />
+              Generate Admin Invite Link
+            </DialogTitle>
+            <DialogDescription>
+              Create a shareable link for someone to set up their admin account. Links expire after 7 days and can only be used once.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!inviteUrl ? (
+            <div className="space-y-4 py-2">
+              <div>
+                <label className="text-sm font-medium text-foreground">Role</label>
+                <Select value={inviteRole} onValueChange={setInviteRole}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="observer">Observer — read-only access</SelectItem>
+                    <SelectItem value="editor">Editor — can manage candidates & settings</SelectItem>
+                    <SelectItem value="super_admin">Super Admin — full access</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground">Pre-fill email (optional)</label>
+                <Input
+                  className="mt-1.5"
+                  type="email"
+                  placeholder="Leave blank to allow any email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground mt-1">If set, the join form will be pre-filled with this email.</p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={handleInviteClose}>Cancel</Button>
+                <Button onClick={handleCreateInvite} disabled={isCreatingInvite}>
+                  {isCreatingInvite ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Link2 className="h-4 w-4 mr-2" />}
+                  Generate Link
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5 dark:bg-emerald-950/20 dark:border-emerald-800">
+                <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">Invite link created!</span>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground">Share this link</label>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <div className="flex-1 bg-muted rounded-lg px-3 py-2 text-xs font-mono text-muted-foreground truncate border border-border">
+                    {inviteUrl}
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleCopyInvite} className="shrink-0">
+                    {copiedInvite ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">Expires in 7 days. Single use only.</p>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleInviteClose}>Done</Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Reset password dialog */}
       <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open) { setResetTarget(null); resetForm.reset(); } }}>
