@@ -22,6 +22,11 @@ const PgStore = connectPgSimple(session);
 
 const app: Express = express();
 
+// Trust Replit's reverse proxy so Express sees HTTPS correctly.
+// Without this, `secure: true` cookies are never echoed back by the browser
+// because Express thinks the request is plain HTTP.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,
@@ -57,7 +62,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      sameSite: "strict",
+      sameSite: "lax",
       maxAge: 30 * 60 * 1000,
       secure: process.env.NODE_ENV === "production",
     },
