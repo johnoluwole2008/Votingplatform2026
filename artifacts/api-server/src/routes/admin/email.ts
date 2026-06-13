@@ -42,10 +42,12 @@ function createTransporter(cfg: { host: string; port: number; user: string; pass
 }
 
 function applyMergeTags(text: string, student: { full_name: string; email: string; matric_number?: string }): string {
+  const domain = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : process.env.APP_URL ?? "";
   return text
     .replace(/\[Name\]/gi, student.full_name)
     .replace(/\[Email\]/gi, student.email)
-    .replace(/\[Matric\]/gi, student.matric_number ?? "");
+    .replace(/\[Matric\]/gi, student.matric_number ?? "")
+    .replace(/\[VotingLink\]/gi, `${domain}/login`);
 }
 
 // GET /admin/email/settings

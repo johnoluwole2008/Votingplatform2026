@@ -10,6 +10,7 @@ import {
   useUpdateOffice,
   useDeleteOffice,
   useCreateCandidate,
+  useUpdateCandidate,
   useDeleteCandidate,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -41,9 +42,17 @@ const editOfficeSchema = z.object({
   displayOrder: z.coerce.number().default(0),
 });
 
+const editCandidateSchema = z.object({
+  fullName: z.string().min(2, "Name required"),
+  bio: z.string().optional(),
+  level: z.string().optional(),
+  photoUrl: z.string().optional().or(z.literal("")),
+});
+
 type OfficeFormData = z.infer<typeof officeSchema>;
 type CandidateFormData = z.infer<typeof candidateSchema>;
 type EditOfficeFormData = z.infer<typeof editOfficeSchema>;
+type EditCandidateFormData = z.infer<typeof editCandidateSchema>;
 
 interface OfficeWithCandidates {
   id: number;
@@ -60,16 +69,21 @@ export default function AdminOfficesPage() {
   const [expandedOffice, setExpandedOffice] = useState<number | null>(null);
   const [addingCandidateFor, setAddingCandidateFor] = useState<number | null>(null);
   const [editingOfficeId, setEditingOfficeId] = useState<number | null>(null);
+  const [editingCandidateId, setEditingCandidateId] = useState<number | null>(null);
   const [showOfficeForm, setShowOfficeForm] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [editCandidatePhotoUploading, setEditCandidatePhotoUploading] = useState(false);
+  const [editCandidatePhotoPreview, setEditCandidatePhotoPreview] = useState<string | null>(null);
   const photoFileRef = useRef<HTMLInputElement>(null);
+  const editPhotoFileRef = useRef<HTMLInputElement>(null);
 
   const { data: offices, isLoading } = useListOffices({ query: { refetchInterval: 60_000 } });
   const createOffice = useCreateOffice();
   const updateOffice = useUpdateOffice();
   const deleteOffice = useDeleteOffice();
   const createCandidate = useCreateCandidate();
+  const updateCandidate = useUpdateCandidate();
   const deleteCandidate = useDeleteCandidate();
 
   const isObserver = session.data?.role === "observer";
@@ -82,6 +96,11 @@ export default function AdminOfficesPage() {
   const editOfficeForm = useForm<EditOfficeFormData>({
     resolver: zodResolver(editOfficeSchema),
     defaultValues: { title: "", description: "", displayOrder: 0 },
+  });
+
+  const editCandidateForm = useForm<EditCandidateFormData>({
+    resolver: zodResolver(editCandidateSchema),
+    defaultValues: { fullName: "", bio: "", level: "", photoUrl: "" },
   });
 
   const candidateForm = useForm<CandidateFormData>({
@@ -159,6 +178,62 @@ export default function AdminOfficesPage() {
           toast({ title: "Office deleted" });
         },
         onError: () => toast({ title: "Delete failed", variant: "destructive" }),
+      },
+    );
+  };
+
+  const handleEditPhotoUpload = async (file: File) => {
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Photo must be under 2 MB.", variant: "destructive" });
+      return;
+    }
+    setEditCandidatePhotoUploading(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+      });
+      editCandidateForm.setValue("photoUrl", dataUrl);
+      setEditCandidatePhotoPreview(dataUrl);
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally { setEditCandidatePhotoUploading(false); }
+  };
+
+  const handleStartEditCandidate = (c: { id: number; fullName: string; bio?: string | null; level?: string | null; photoUrl?: string | null }) => {
+    editCandidateForm.reset({
+      fullName: c.fullName,
+      bio: c.bio ?? "",
+      level: c.level ?? "",
+      photoUrl: c.photoUrl ?? "",
+    });
+    setEditCandidatePhotoPreview(c.photoUrl ?? null);
+    setEditingCandidateId(c.id);
+    setAddingCandidateFor(null);
+  };
+
+  const handleSaveEditCandidate = (data: EditCandidateFormData) => {
+    if (!editingCandidateId) return;
+    updateCandidate.mutate(
+      {
+        id: editingCandidateId,
+        data: {
+          fullName: data.fullName,
+          bio: data.bio,
+          level: data.level,
+          photoUrl: data.photoUrl || undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["listOffices"] });
+          toast({ title: "Candidate updated" });
+          setEditingCandidateId(null);
+          setEditCandidatePhotoPreview(null);
+        },
+        onError: () => toast({ title: "Failed to update candidate", variant: "destructive" }),
       },
     );
   };
@@ -352,34 +427,129 @@ export default function AdminOfficesPage() {
                 {expandedOffice === office.id && editingOfficeId !== office.id && (
                   <div className="border-t border-border">
                     {office.candidates.map((c) => (
-                      <div key={c.id} className="flex items-center justify-between px-5 py-3 border-b border-border last:border-0" data-testid={`candidate-card-${c.id}`}>
-                        <div className="flex items-center gap-3 min-w-0">
-                          {c.photoUrl ? (
-                            <img
-                              src={c.photoUrl}
-                              alt={c.fullName}
-                              className="h-9 w-9 rounded-full object-cover shrink-0 border border-border"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                            />
-                          ) : (
-                            <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
-                              <ImageIcon className="h-4 w-4 text-muted-foreground opacity-50" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium text-foreground">{c.fullName}</div>
-                            {c.level && <div className="text-xs text-muted-foreground">{c.level}</div>}
-                            {c.bio && <div className="text-xs text-muted-foreground line-clamp-1">{c.bio}</div>}
+                      <div key={c.id} className="border-b border-border last:border-0" data-testid={`candidate-card-${c.id}`}>
+                        {editingCandidateId === c.id ? (
+                          /* ── Inline edit form ── */
+                          <div className="px-5 py-4 bg-muted/20">
+                            <p className="text-xs font-semibold text-muted-foreground mb-3">Editing: {c.fullName}</p>
+                            <Form {...editCandidateForm}>
+                              <form onSubmit={editCandidateForm.handleSubmit(handleSaveEditCandidate)} className="space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                  <FormField control={editCandidateForm.control} name="fullName" render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-xs">Full Name</FormLabel>
+                                      <FormControl><Input {...field} /></FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )} />
+                                  <FormField control={editCandidateForm.control} name="level" render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-xs">Level (optional)</FormLabel>
+                                      <FormControl><Input {...field} placeholder="e.g. 400L" /></FormControl>
+                                    </FormItem>
+                                  )} />
+                                </div>
+                                <FormField control={editCandidateForm.control} name="bio" render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs">Bio (optional)</FormLabel>
+                                    <FormControl><Input {...field} placeholder="Brief bio or tagline" /></FormControl>
+                                  </FormItem>
+                                )} />
+                                <FormField control={editCandidateForm.control} name="photoUrl" render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs flex items-center gap-1.5">
+                                      <ImageIcon className="h-3 w-3" /> Photo (optional)
+                                    </FormLabel>
+                                    <div className="flex items-center gap-3">
+                                      {(editCandidatePhotoPreview || field.value) && (
+                                        <img
+                                          src={editCandidatePhotoPreview ?? field.value}
+                                          alt="Preview"
+                                          className="h-10 w-10 rounded-full object-cover border border-border shrink-0"
+                                        />
+                                      )}
+                                      <div className="flex flex-col gap-1">
+                                        <input
+                                          ref={editPhotoFileRef}
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          onChange={e => { const f = e.target.files?.[0]; if (f) handleEditPhotoUpload(f); e.target.value = ""; }}
+                                        />
+                                        <Button
+                                          type="button" variant="outline" size="sm"
+                                          disabled={editCandidatePhotoUploading}
+                                          onClick={() => editPhotoFileRef.current?.click()}
+                                        >
+                                          {editCandidatePhotoUploading
+                                            ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Uploading…</>
+                                            : <><Upload className="h-3.5 w-3.5 mr-1.5" />{field.value ? "Replace photo" : "Upload photo"}</>}
+                                        </Button>
+                                        {field.value && (
+                                          <button
+                                            type="button"
+                                            className="text-xs text-muted-foreground hover:text-destructive text-left"
+                                            onClick={() => { field.onChange(""); setEditCandidatePhotoPreview(null); }}
+                                          >Remove photo</button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </FormItem>
+                                )} />
+                                <div className="flex gap-2">
+                                  <Button type="submit" size="sm" disabled={updateCandidate.isPending}>
+                                    {updateCandidate.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+                                    Save Changes
+                                  </Button>
+                                  <Button type="button" variant="outline" size="sm" onClick={() => { setEditingCandidateId(null); setEditCandidatePhotoPreview(null); }}>
+                                    <X className="h-3 w-3 mr-1" /> Cancel
+                                  </Button>
+                                </div>
+                              </form>
+                            </Form>
                           </div>
-                        </div>
-                        {!isObserver && (
-                          <button
-                            onClick={() => handleDeleteCandidate(c.id, c.fullName)}
-                            className="text-muted-foreground hover:text-destructive p-1 transition-colors shrink-0"
-                            data-testid={`button-delete-candidate-${c.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                        ) : (
+                          /* ── Normal row ── */
+                          <div className="flex items-center justify-between px-5 py-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {c.photoUrl ? (
+                                <img
+                                  src={c.photoUrl}
+                                  alt={c.fullName}
+                                  className="h-9 w-9 rounded-full object-cover shrink-0 border border-border"
+                                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                />
+                              ) : (
+                                <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                  <ImageIcon className="h-4 w-4 text-muted-foreground opacity-50" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium text-foreground">{c.fullName}</div>
+                                {c.level && <div className="text-xs text-muted-foreground">{c.level}</div>}
+                                {c.bio && <div className="text-xs text-muted-foreground line-clamp-1">{c.bio}</div>}
+                              </div>
+                            </div>
+                            {!isObserver && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  onClick={() => handleStartEditCandidate(c)}
+                                  className="text-muted-foreground hover:text-primary p-1 transition-colors"
+                                  title="Edit candidate"
+                                  data-testid={`button-edit-candidate-${c.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCandidate(c.id, c.fullName)}
+                                  className="text-muted-foreground hover:text-destructive p-1 transition-colors"
+                                  data-testid={`button-delete-candidate-${c.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     ))}

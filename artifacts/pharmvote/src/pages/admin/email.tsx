@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Send, Settings2, TestTube, Mail, Clock, Trash2, Bell, BellOff } from "lucide-react";
+import { Loader2, Send, Settings2, TestTube, Mail, Clock, Trash2, Bell, BellOff, Link, Copy, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -61,6 +61,17 @@ export default function AdminEmailPage() {
 
   // Confirm dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Voter link copy state
+  const [copiedLink, setCopiedLink] = useState<"register" | "login" | null>(null);
+
+  const copyLink = (type: "register" | "login") => {
+    const url = `${window.location.origin}/${type}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedLink(type);
+      setTimeout(() => setCopiedLink(null), 2000);
+    });
+  };
 
   useEffect(() => {
     if (isSuperAdmin) loadSmtpSettings();
@@ -235,69 +246,102 @@ export default function AdminEmailPage() {
 
         {/* Compose Tab */}
         {tab === "send" && (
-          <div className="space-y-5 bg-card border border-border rounded-xl p-6">
-            <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5">Recipients</label>
-              <Select value={recipientGroup} onValueChange={setRecipientGroup} disabled={isObserver}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(GROUP_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5">Subject</label>
-              <Input placeholder="e.g. PANS Election — Voting Day Reminder" value={subject} onChange={e => setSubject(e.target.value)} disabled={isObserver} />
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-sm font-medium text-foreground">Message Body</label>
-                {!isObserver && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground mr-1">Insert:</span>
-                    {["[Name]", "[Email]", "[Matric]"].map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => insertPlaceholder(tag)}
-                        className="text-xs bg-muted hover:bg-muted/80 text-foreground font-mono px-1.5 py-0.5 rounded border border-border transition-colors"
-                      >
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
-                )}
+          <div className="space-y-5">
+            {/* Voter links card */}
+            <div className="bg-card border border-border rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Link className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold text-foreground">Voter Links</span>
+                <span className="text-xs text-muted-foreground ml-1">— copy and paste into your emails</span>
               </div>
-              <Textarea
-                placeholder={"Dear [Name],\n\nVoting is now open! Log in to cast your ballot.\n\n— PharmSci E-Voting Team"}
-                value={body}
-                onChange={e => setBody(e.target.value)}
-                rows={9}
-                disabled={isObserver}
-                className="font-mono text-sm"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Use <code className="bg-muted px-1 rounded">[Name]</code>, <code className="bg-muted px-1 rounded">[Email]</code>, or <code className="bg-muted px-1 rounded">[Matric]</code> — each email is personalised with the student's actual details.
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs bg-muted text-foreground px-3 py-2 rounded-md border border-border truncate font-mono">
+                    {`${window.location.origin}/register`}
+                  </code>
+                  <Button variant="outline" size="sm" className="shrink-0 w-28" onClick={() => copyLink("register")}>
+                    {copiedLink === "register" ? <><Check className="h-3.5 w-3.5 mr-1.5 text-emerald-600" />Copied!</> : <><Copy className="h-3.5 w-3.5 mr-1.5" />Register</>}
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs bg-muted text-foreground px-3 py-2 rounded-md border border-border truncate font-mono">
+                    {`${window.location.origin}/login`}
+                  </code>
+                  <Button variant="outline" size="sm" className="shrink-0 w-28" onClick={() => copyLink("login")}>
+                    {copiedLink === "login" ? <><Check className="h-3.5 w-3.5 mr-1.5 text-emerald-600" />Copied!</> : <><Copy className="h-3.5 w-3.5 mr-1.5" />Login</>}
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Use <code className="bg-muted px-1 rounded">[VotingLink]</code> in your email body — it is automatically replaced with the login URL for each student.
               </p>
             </div>
-            <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5 flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5" /> Schedule (optional)
-              </label>
-              <Input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} disabled={isObserver} />
-              <p className="text-xs text-muted-foreground mt-1">Leave blank to send immediately.</p>
+
+            {/* Compose form */}
+            <div className="space-y-5 bg-card border border-border rounded-xl p-6">
+              <div>
+                <label className="text-sm font-medium text-foreground block mb-1.5">Recipients</label>
+                <Select value={recipientGroup} onValueChange={setRecipientGroup} disabled={isObserver}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(GROUP_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground block mb-1.5">Subject</label>
+                <Input placeholder="e.g. PANS Election — Voting Day Reminder" value={subject} onChange={e => setSubject(e.target.value)} disabled={isObserver} />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-medium text-foreground">Message Body</label>
+                  {!isObserver && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-muted-foreground mr-1">Insert:</span>
+                      {["[Name]", "[Email]", "[Matric]", "[VotingLink]"].map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => insertPlaceholder(tag)}
+                          className="text-xs bg-muted hover:bg-muted/80 text-foreground font-mono px-1.5 py-0.5 rounded border border-border transition-colors"
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Textarea
+                  placeholder={"Dear [Name],\n\nVoting is now open! Log in to cast your ballot.\n\n— PharmSci E-Voting Team"}
+                  value={body}
+                  onChange={e => setBody(e.target.value)}
+                  rows={9}
+                  disabled={isObserver}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use <code className="bg-muted px-1 rounded">[Name]</code>, <code className="bg-muted px-1 rounded">[Email]</code>, or <code className="bg-muted px-1 rounded">[Matric]</code> — each email is personalised with the student&apos;s actual details.
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground block mb-1.5 flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5" /> Schedule (optional)
+                </label>
+                <Input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} disabled={isObserver} />
+                <p className="text-xs text-muted-foreground mt-1">Leave blank to send immediately.</p>
+              </div>
+              {!isObserver && (
+                <Button
+                  className="w-full"
+                  disabled={!subject || !body || !smtpConfigured || isSending}
+                  onClick={() => setConfirmOpen(true)}
+                >
+                  {isSending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending…</> : <><Send className="h-4 w-4 mr-2" />{scheduledAt ? "Schedule Email" : "Send Now"}</>}
+                </Button>
+              )}
             </div>
-            {!isObserver && (
-              <Button
-                className="w-full"
-                disabled={!subject || !body || !smtpConfigured || isSending}
-                onClick={() => setConfirmOpen(true)}
-              >
-                {isSending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending…</> : <><Send className="h-4 w-4 mr-2" />{scheduledAt ? "Schedule Email" : "Send Now"}</>}
-              </Button>
-            )}
           </div>
         )}
 
