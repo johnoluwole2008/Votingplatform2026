@@ -51,9 +51,7 @@ export default function AdminLoginPage() {
     <div className="min-h-screen bg-muted/20 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-4">
-            <ShieldCheck className="h-6 w-6 text-primary-foreground" />
-          </div>
+          <img src="/logo.png" alt="PharmSci Logo" className="h-16 w-16 object-contain mx-auto mb-4" />
           <h1 className="text-xl font-bold text-foreground">Electoral Committee Access</h1>
           <p className="text-sm text-muted-foreground mt-1">Secure administrator portal</p>
         </div>

@@ -136,9 +136,13 @@ export default function AdminVotersPage() {
                       <td className="px-4 py-3 text-muted-foreground">{v.level}</td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">{v.email}</td>
                       <td className="px-4 py-3">
-                        <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium", v.hasVoted ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground")}>
-                          {v.hasVoted ? "Voted" : "Pending"}
-                        </span>
+                        {v.hasVoted ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Voted</span>
+                        ) : (v as any).isActivated === false ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">No Password Set</span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">Pending Vote</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">
                         {new Date(v.registrationTimestamp).toLocaleDateString()}

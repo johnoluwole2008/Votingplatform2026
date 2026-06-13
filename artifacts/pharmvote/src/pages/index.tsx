@@ -47,9 +47,7 @@ export default function IndexPage() {
       <header className="border-b border-border bg-card px-4 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center">
-              <Shield className="h-4 w-4 text-primary-foreground" />
-            </div>
+            <img src="/logo.png" alt="PharmSci Logo" className="h-10 w-10 object-contain" />
             <div>
               <div className="font-semibold text-sm text-foreground">PharmSci E-Voting</div>
               <div className="text-xs text-muted-foreground">Faculty of Pharmaceutical Sciences</div>

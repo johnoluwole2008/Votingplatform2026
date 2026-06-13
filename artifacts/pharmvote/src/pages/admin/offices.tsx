@@ -90,25 +90,21 @@ export default function AdminOfficesPage() {
   });
 
   const handlePhotoUpload = async (file: File) => {
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Photo must be under 2 MB.", variant: "destructive" });
+      return;
+    }
     setPhotoUploading(true);
     try {
-      const reqRes = await fetch("/api/storage/uploads/request-url", {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentType: file.type, folder: "candidate-photos" }),
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
       });
-      if (!reqRes.ok) throw new Error("Failed to get upload URL");
-      const { uploadUrl, objectPath } = await reqRes.json();
-      const putRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!putRes.ok) throw new Error("Upload failed");
-      const servedUrl = `/api/storage/objects/${objectPath}`;
-      candidateForm.setValue("photoUrl", servedUrl);
-      setPhotoPreview(URL.createObjectURL(file));
-      toast({ title: "Photo uploaded!" });
+      candidateForm.setValue("photoUrl", dataUrl);
+      setPhotoPreview(dataUrl);
+      toast({ title: "Photo ready", description: "Photo will be saved when you add the candidate." });
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     } finally { setPhotoUploading(false); }

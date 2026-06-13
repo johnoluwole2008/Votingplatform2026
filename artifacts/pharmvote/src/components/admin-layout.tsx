@@ -67,7 +67,7 @@ export default function AdminLayout({ children, role }: AdminLayoutProps) {
     <div className="flex flex-col h-full">
       <div className="px-6 py-5 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-primary" />
+          <img src="/logo.png" alt="PharmSci Logo" className="h-7 w-7 object-contain" />
           <span className="font-semibold text-sm text-sidebar-foreground">PharmSci Admin</span>
         </div>
         <p className="text-xs text-muted-foreground mt-1">Electoral Committee Portal</p>
@@ -149,7 +149,7 @@ export default function AdminLayout({ children, role }: AdminLayoutProps) {
             <Menu className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2 flex-1">
-            <ShieldCheck className="h-4 w-4 text-primary" />
+            <img src="/logo.png" alt="PharmSci Logo" className="h-6 w-6 object-contain" />
             <span className="font-semibold text-sm">PharmSci Admin</span>
           </div>
           <ThemeToggle />

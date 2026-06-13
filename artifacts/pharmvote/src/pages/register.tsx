@@ -55,9 +55,7 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b border-border bg-card px-4 py-4">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
-            <Shield className="h-4 w-4 text-primary-foreground" />
-          </div>
+          <img src="/logo.png" alt="PharmSci Logo" className="h-8 w-8 object-contain" />
           <span className="font-semibold text-sm">PharmSci E-Voting — Student Registration</span>
         </div>
       </header>

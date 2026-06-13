@@ -64,6 +64,7 @@ router.get("/admin/voters", async (req, res): Promise<void> => {
       email: v.email,
       level: v.level,
       hasVoted: v.hasVoted,
+      isActivated: v.passwordHash !== null,
       registrationTimestamp: v.registrationTimestamp.toISOString(),
       ipAddress: v.ipAddress ?? null,
       voteTimestamp: v.voteTimestamp?.toISOString() ?? null,
