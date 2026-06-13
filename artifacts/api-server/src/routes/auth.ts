@@ -5,6 +5,7 @@ import {
   studentRecordsTable,
 } from "@workspace/db";
 import {
+  hashPassword,
   verifyPassword,
   isAccountLocked,
   recordLoginAttempt,
@@ -12,9 +13,72 @@ import {
 } from "../lib/auth";
 import { logAuditEvent } from "../lib/audit";
 import { getElectionPhase } from "../lib/election";
-import { LoginVoterBody } from "@workspace/api-zod";
+import { LoginVoterBody, RegisterVoterBody } from "@workspace/api-zod";
 
 const router = Router();
+
+// ── Register ──────────────────────────────────────────────────────────────────
+
+router.post("/auth/register", async (req, res): Promise<void> => {
+  const parsed = RegisterVoterBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid registration details." });
+    return;
+  }
+
+  const { matricNumber, email, fullName, level, password } = parsed.data;
+
+  const { registrationOpen } = await getElectionPhase();
+  if (!registrationOpen) {
+    res.status(403).json({ error: "Voter registration is not currently open." });
+    return;
+  }
+
+  const normalizedMatric = matricNumber.trim().toUpperCase();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const [student] = await db
+    .select()
+    .from(studentRecordsTable)
+    .where(
+      and(
+        eq(studentRecordsTable.matricNumber, normalizedMatric),
+        eq(studentRecordsTable.email, normalizedEmail),
+      ),
+    )
+    .limit(1);
+
+  if (!student) {
+    res.status(404).json({
+      error: "No matching student record found. Check your matric number and school email address, or contact the Electoral Committee.",
+    });
+    return;
+  }
+
+  if (student.personalCodeHash) {
+    res.status(409).json({
+      error: "You have already registered. Use the Login page to access the ballot.",
+    });
+    return;
+  }
+
+  const passwordHash = await hashPassword(password);
+
+  await db
+    .update(studentRecordsTable)
+    .set({ personalCodeHash: passwordHash })
+    .where(eq(studentRecordsTable.id, student.id));
+
+  await logAuditEvent({
+    eventType: "voter_registered",
+    description: `Voter registered: ${student.fullName} (${normalizedMatric})`,
+    actorId: normalizedMatric,
+    actorType: "student",
+    ipAddress: getClientIp(req),
+  });
+
+  res.status(201).json({ success: true, message: "Registration successful. You can now log in on Election Day." });
+});
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 
