@@ -81,11 +81,11 @@ export default function IndexPage() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            {(status?.phase === "voting" || !status) && (
+            {(status?.votingOpen || !status) && (
               <Link href="/login">
                 <Button
                   size="lg"
-                  variant={status?.phase === "voting" ? "default" : "outline"}
+                  variant="default"
                   className="w-full sm:w-auto px-10"
                   data-testid="button-login"
                 >
@@ -93,7 +93,14 @@ export default function IndexPage() {
                 </Button>
               </Link>
             )}
-            {(status?.phase === "setup" || status?.phase === "registration") && (
+            {status?.registrationOpen && !status.votingOpen && (
+              <Link href="/register">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto px-10" data-testid="button-register">
+                  Register to Vote
+                </Button>
+              </Link>
+            )}
+            {status && !status.votingOpen && !status.registrationOpen && status.phase !== "results" && status.phase !== "audit" && (
               <div className="text-muted-foreground text-sm py-3 px-6 border border-border rounded-lg">
                 The election has not yet opened. Check back on Election Day.
               </div>
