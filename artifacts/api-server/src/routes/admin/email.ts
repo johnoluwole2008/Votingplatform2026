@@ -1,7 +1,7 @@
 import { Router } from "express";
 import nodemailer from "nodemailer";
-import { eq, and, lte, sql } from "drizzle-orm";
-import { db, electionSettingsTable, studentRecordsTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
+import { db, electionSettingsTable, studentRecordsTable, voterRegistrationsTable } from "@workspace/db";
 import { logAuditEvent } from "../../lib/audit";
 import { getOrCreateSettings } from "../../lib/election";
 
@@ -39,6 +39,13 @@ function createTransporter(cfg: { host: string; port: number; user: string; pass
     auth: { user: cfg.user, pass: cfg.pass },
     tls: { rejectUnauthorized: false },
   });
+}
+
+function applyMergeTags(text: string, student: { full_name: string; email: string; matric_number?: string }): string {
+  return text
+    .replace(/\[Name\]/gi, student.full_name)
+    .replace(/\[Email\]/gi, student.email)
+    .replace(/\[Matric\]/gi, student.matric_number ?? "");
 }
 
 // GET /admin/email/settings
@@ -139,6 +146,60 @@ router.post("/admin/email/send", async (req, res): Promise<void> => {
   res.json({ success: true, scheduled: isScheduled, message: isScheduled ? `Email scheduled for ${new Date(scheduledAt).toLocaleString()}` : "Email is being sent now." });
 });
 
+// POST /admin/email/notify-phase — sends a voting open/closed notification to registered voters
+router.post("/admin/email/notify-phase", async (req, res): Promise<void> => {
+  if (!requireEditor(req, res)) return;
+  const { phase } = req.body;
+  if (phase !== "voting_open" && phase !== "voting_closed") {
+    res.status(400).json({ error: "phase must be 'voting_open' or 'voting_closed'" }); return;
+  }
+
+  const settings = await getOrCreateSettings() as any;
+  const electionName = settings.electionName ?? "Faculty Student Elections";
+
+  let subject: string;
+  let body: string;
+
+  if (phase === "voting_open") {
+    subject = `🗳️ Voting is now open — ${electionName}`;
+    body = `Dear [Name],
+
+Voting for the ${electionName} is now officially open!
+
+Log in with your matric number and personal code to cast your ballot:
+https://${process.env.REPLIT_DEV_DOMAIN ?? "your-election-site.com"}/login
+
+Voting closes soon — every vote counts. Make your voice heard.
+
+— PharmSci E-Voting Team`;
+  } else {
+    subject = `Voting has closed — ${electionName}`;
+    body = `Dear [Name],
+
+Voting for the ${electionName} has now closed. Thank you for participating in this election.
+
+Results will be announced soon.
+
+— PharmSci E-Voting Team`;
+  }
+
+  const [job] = await db.execute(sql`
+    INSERT INTO email_jobs (subject, body, recipient_group, scheduled_at, status, created_by_admin_id)
+    VALUES (${subject}, ${body}, 'registered_voters', null, 'pending', ${req.session.adminId})
+    RETURNING *
+  `) as any;
+
+  sendEmailJob((job as any).rows?.[0] ?? job).catch((err) => console.error("Phase notification email job failed:", err));
+
+  await logAuditEvent({
+    eventType: "email_phase_notification",
+    description: `Phase notification sent: ${phase} → registered_voters`,
+    actorId: String(req.session.adminId), actorType: "admin",
+  });
+
+  res.json({ success: true, message: `Sending ${phase === "voting_open" ? "voting open" : "voting closed"} notification to all registered voters.` });
+});
+
 // DELETE /admin/email/jobs/:id
 router.delete("/admin/email/jobs/:id", async (req, res): Promise<void> => {
   if (!requireEditor(req, res)) return;
@@ -163,8 +224,8 @@ export async function sendEmailJob(job: any): Promise<void> {
     whereClause = sql`1=1`;
   }
 
-  const recipients = await db.execute(sql`SELECT email, full_name FROM student_records WHERE ${whereClause}`);
-  const rows = recipients.rows as { email: string; full_name: string }[];
+  const recipients = await db.execute(sql`SELECT email, full_name, matric_number FROM student_records WHERE ${whereClause}`);
+  const rows = recipients.rows as { email: string; full_name: string; matric_number: string }[];
 
   if (rows.length === 0) {
     await db.execute(sql`UPDATE email_jobs SET status = 'sent', sent_count = 0 WHERE id = ${job.id}`);
@@ -178,13 +239,15 @@ export async function sendEmailJob(job: any): Promise<void> {
   const errors: string[] = [];
 
   for (const row of rows) {
+    const personalizedSubject = applyMergeTags(job.subject, row);
+    const personalizedBody = applyMergeTags(job.body, row);
     try {
       await transporter.sendMail({
         from: `"${cfg.fromName}" <${cfg.from || cfg.user}>`,
         to: `"${row.full_name}" <${row.email}>`,
-        subject: job.subject,
-        html: job.body.replace(/\n/g, "<br>"),
-        text: job.body,
+        subject: personalizedSubject,
+        html: personalizedBody.replace(/\n/g, "<br>"),
+        text: personalizedBody,
       });
       sent++;
     } catch (err: any) {
@@ -205,6 +268,46 @@ export async function processScheduledEmailJobs(): Promise<void> {
   `);
   for (const job of (due.rows as any[])) {
     await sendEmailJob(job).catch(() => {});
+  }
+}
+
+export async function sendVoterReceiptEmail(voter: {
+  email: string;
+  fullName: string;
+  matricNumber: string;
+  voteTimestamp: Date;
+}): Promise<void> {
+  const cfg = await getSmtpConfig();
+  if (!cfg.host || !cfg.user || !cfg.pass) return;
+
+  const settings = await getOrCreateSettings() as any;
+  const electionName = settings.electionName ?? "Faculty Student Elections";
+  const formattedTime = voter.voteTimestamp.toLocaleString("en-NG", { dateStyle: "full", timeStyle: "short" });
+
+  const subject = `Your voting receipt — ${electionName}`;
+  const body = `Dear ${voter.fullName},
+
+This is to confirm that your vote has been successfully recorded in the ${electionName}.
+
+Matric Number: ${voter.matricNumber}
+Time of vote: ${formattedTime}
+
+Your ballot is anonymous — no record links your identity to your specific choices.
+
+Thank you for participating!
+
+— PharmSci E-Voting Team`;
+
+  try {
+    const transporter = createTransporter({ host: cfg.host!, port: cfg.port, user: cfg.user!, pass: cfg.pass! });
+    await transporter.sendMail({
+      from: `"${cfg.fromName}" <${cfg.from || cfg.user}>`,
+      to: `"${voter.fullName}" <${voter.email}>`,
+      subject,
+      html: body.replace(/\n/g, "<br>"),
+      text: body,
+    });
+  } catch {
   }
 }
 

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Send, Settings2, TestTube, Mail, Clock, Trash2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Loader2, Send, Settings2, TestTube, Mail, Clock, Trash2, Bell, BellOff } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -38,6 +38,10 @@ export default function AdminEmailPage() {
   const [recipientGroup, setRecipientGroup] = useState("all_students");
   const [scheduledAt, setScheduledAt] = useState("");
   const [isSending, setIsSending] = useState(false);
+
+  // Phase notification
+  const [isNotifying, setIsNotifying] = useState<"voting_open" | "voting_closed" | null>(null);
+  const [notifyConfirmPhase, setNotifyConfirmPhase] = useState<"voting_open" | "voting_closed" | null>(null);
 
   // SMTP settings
   const [smtpHost, setSmtpHost] = useState("");
@@ -146,6 +150,27 @@ export default function AdminEmailPage() {
     loadJobs();
   };
 
+  const handleNotifyPhase = async (phase: "voting_open" | "voting_closed") => {
+    setIsNotifying(phase);
+    setNotifyConfirmPhase(null);
+    try {
+      const r = await fetch("/api/admin/email/notify-phase", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phase }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      toast({ title: "Notification sent!", description: d.message });
+    } catch (err: any) {
+      toast({ title: "Failed to send notification", description: err.message, variant: "destructive" });
+    } finally { setIsNotifying(null); }
+  };
+
+  const insertPlaceholder = (tag: string) => {
+    setBody((prev) => prev + tag);
+  };
+
   return (
     <AdminLayout role={session.data?.role}>
       <div className="px-6 py-8 max-w-3xl">
@@ -157,11 +182,37 @@ export default function AdminEmailPage() {
 
         {!smtpConfigured && !isObserver && (
           <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 dark:bg-amber-950/20 dark:border-amber-800 rounded-lg px-4 py-3 text-sm mb-6">
-            <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <Bell className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
             <div>
               <span className="font-medium text-amber-800 dark:text-amber-300">SMTP not configured.</span>
               {isSuperAdmin ? <> Go to the <button onClick={() => setTab("smtp")} className="underline">SMTP Settings</button> tab to set up email sending.</> : " Ask a super admin to configure SMTP settings."}
             </div>
+          </div>
+        )}
+
+        {/* Quick notification buttons */}
+        {!isObserver && (
+          <div className="bg-card border border-border rounded-xl p-4 mb-6">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Quick Notifications — Registered Voters</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline" size="sm"
+                disabled={!smtpConfigured || isNotifying !== null}
+                onClick={() => setNotifyConfirmPhase("voting_open")}
+              >
+                {isNotifying === "voting_open" ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Bell className="h-3.5 w-3.5 mr-1.5" />}
+                Voting is Open
+              </Button>
+              <Button
+                variant="outline" size="sm"
+                disabled={!smtpConfigured || isNotifying !== null}
+                onClick={() => setNotifyConfirmPhase("voting_closed")}
+              >
+                {isNotifying === "voting_closed" ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <BellOff className="h-3.5 w-3.5 mr-1.5" />}
+                Voting is Closed
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">Sends a pre-written notification to all registered voters instantly.</p>
           </div>
         )}
 
@@ -201,15 +252,35 @@ export default function AdminEmailPage() {
               <Input placeholder="e.g. PANS Election — Voting Day Reminder" value={subject} onChange={e => setSubject(e.target.value)} disabled={isObserver} />
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5">Message Body</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium text-foreground">Message Body</label>
+                {!isObserver && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground mr-1">Insert:</span>
+                    {["[Name]", "[Email]", "[Matric]"].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => insertPlaceholder(tag)}
+                        className="text-xs bg-muted hover:bg-muted/80 text-foreground font-mono px-1.5 py-0.5 rounded border border-border transition-colors"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <Textarea
-                placeholder="Write your message here. You can include the registration or voting link in the body."
+                placeholder={"Dear [Name],\n\nVoting is now open! Log in to cast your ballot.\n\n— PharmSci E-Voting Team"}
                 value={body}
                 onChange={e => setBody(e.target.value)}
-                rows={8}
+                rows={9}
                 disabled={isObserver}
+                className="font-mono text-sm"
               />
-              <p className="text-xs text-muted-foreground mt-1">Plain text. Paste the registration or voting link directly in the message.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Use <code className="bg-muted px-1 rounded">[Name]</code>, <code className="bg-muted px-1 rounded">[Email]</code>, or <code className="bg-muted px-1 rounded">[Matric]</code> — each email is personalised with the student's actual details.
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium text-foreground block mb-1.5 flex items-center gap-1.5">
@@ -338,6 +409,32 @@ export default function AdminEmailPage() {
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
             <Button onClick={handleSend} disabled={isSending}>
               {isSending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending…</> : scheduledAt ? "Schedule" : "Send Now"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Phase notification confirm dialog */}
+      <Dialog open={notifyConfirmPhase !== null} onOpenChange={(open) => { if (!open) setNotifyConfirmPhase(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {notifyConfirmPhase === "voting_open" ? "Notify voters: Voting is Open?" : "Notify voters: Voting is Closed?"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 text-sm text-muted-foreground space-y-2">
+            <p><strong className="text-foreground">To:</strong> All registered voters</p>
+            <p>
+              {notifyConfirmPhase === "voting_open"
+                ? "A pre-written notification will be sent immediately to all registered voters letting them know voting is open."
+                : "A pre-written notification will be sent immediately to all registered voters letting them know voting has closed."}
+            </p>
+            <p className="text-amber-600 dark:text-amber-400 text-xs">This cannot be undone.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNotifyConfirmPhase(null)}>Cancel</Button>
+            <Button onClick={() => { if (notifyConfirmPhase) handleNotifyPhase(notifyConfirmPhase); }}>
+              Send Notification
             </Button>
           </DialogFooter>
         </DialogContent>

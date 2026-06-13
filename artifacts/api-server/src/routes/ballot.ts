@@ -11,6 +11,7 @@ import {
 import { logAuditEvent } from "../lib/audit";
 import { getElectionPhase } from "../lib/election";
 import { SubmitBallotBody } from "@workspace/api-zod";
+import { sendVoterReceiptEmail } from "./admin/email";
 
 const router = Router();
 
@@ -158,6 +159,13 @@ router.post("/ballot/submit", async (req, res): Promise<void> => {
     ipAddress: undefined,
     metadata: JSON.stringify({ officeCount: votes.length }),
   });
+
+  sendVoterReceiptEmail({
+    email: voter.email,
+    fullName: voter.fullName,
+    matricNumber: voter.matricNumber,
+    voteTimestamp: new Date(),
+  }).catch(() => {});
 
   res.json({ success: true, message: "Your vote has been recorded." });
 });
