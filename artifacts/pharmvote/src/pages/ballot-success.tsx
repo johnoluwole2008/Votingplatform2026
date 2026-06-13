@@ -1,8 +1,13 @@
 import { CheckCircle, Shield, Lock } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function BallotSuccessPage() {
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="flex justify-end p-3">
+        <ThemeToggle />
+      </div>
+      <div className="flex-1 flex items-center justify-center px-4">
       <div className="w-full max-w-md text-center">
         <div className="h-20 w-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
           <CheckCircle className="h-10 w-10 text-emerald-600" />
@@ -38,6 +43,7 @@ export default function BallotSuccessPage() {
         <p className="text-xs text-muted-foreground">
           You have been logged out. You may safely close this window.
         </p>
+      </div>
       </div>
     </div>
   );

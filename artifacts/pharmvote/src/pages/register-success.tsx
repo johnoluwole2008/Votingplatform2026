@@ -1,10 +1,15 @@
 import { Link } from "wouter";
 import { CheckCircle, Shield, Calendar, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function RegisterSuccessPage() {
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="flex justify-end p-3">
+        <ThemeToggle />
+      </div>
+      <div className="flex-1 flex items-center justify-center px-4">
       <div className="w-full max-w-md text-center">
         <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
           <CheckCircle className="h-8 w-8 text-emerald-600" />
@@ -42,6 +47,7 @@ export default function RegisterSuccessPage() {
             Back to Home <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </Link>
+      </div>
       </div>
     </div>
   );

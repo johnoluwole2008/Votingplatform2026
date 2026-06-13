@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Trophy, BarChart3, Loader2, Lock, ArrowLeft, CheckCircle, PieChart as PieIcon } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 import {
   BarChart,
@@ -81,7 +82,10 @@ export default function ResultsPage() {
             <ArrowLeft className="h-4 w-4" />
             Back to home
           </Link>
-          <span className="text-sm font-semibold text-foreground">Election Results</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-foreground">Election Results</span>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

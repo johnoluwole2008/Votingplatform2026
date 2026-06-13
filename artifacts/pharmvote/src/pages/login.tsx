@@ -8,6 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Shield, Lock, ArrowLeft, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 
@@ -46,7 +47,7 @@ export default function LoginPage() {
           }
         },
         onError: (err: any) => {
-          const msg = err?.response?.data?.error ?? "Invalid credentials or voting is not currently open.";
+          const msg = err?.data?.error ?? err?.message?.replace(/^HTTP \d+ [^:]+:\s*/, "") ?? "Invalid credentials or voting is not currently open.";
           setErrorMsg(msg);
         },
       },
@@ -56,9 +57,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b border-border bg-card px-4 py-4">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <img src="/logo.png" alt="PharmSci Logo" className="h-8 w-8 object-contain" />
-          <span className="font-semibold text-sm">PharmSci E-Voting — Voting Day Login</span>
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="PharmSci Logo" className="h-8 w-8 object-contain" />
+            <span className="font-semibold text-sm">PharmSci E-Voting — Voting Day Login</span>
+          </div>
+          <ThemeToggle />
         </div>
       </header>
 

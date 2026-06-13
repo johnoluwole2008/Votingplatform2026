@@ -40,7 +40,7 @@ export default function AdminLoginPage() {
           setLocation("/admin/dashboard");
         },
         onError: (err: any) => {
-          const msg = err?.data?.error ?? err?.response?.data?.error ?? "Authentication failed. Check your credentials.";
+          const msg = err?.data?.error ?? err?.message?.replace(/^HTTP \d+ [^:]+:\s*/, "") ?? "Authentication failed. Check your credentials.";
           setErrorMsg(msg);
         },
       },

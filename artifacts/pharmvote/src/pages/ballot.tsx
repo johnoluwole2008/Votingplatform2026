@@ -5,6 +5,7 @@ import { useVoterSession } from "@/hooks/use-voter-session";
 import { Loader2, Shield, CheckCircle, AlertCircle, ChevronRight, MinusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function BallotPage() {
   const [, setLocation] = useLocation();
@@ -69,8 +70,9 @@ export default function BallotPage() {
             <Shield className="h-4 w-4 text-primary" />
             <span className="font-semibold text-sm">Faculty Elections — Ballot</span>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {doneCount} / {totalOffices} complete
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{doneCount} / {totalOffices} complete</span>
+            <ThemeToggle />
           </div>
         </div>
       </header>

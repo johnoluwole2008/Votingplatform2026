@@ -2,7 +2,7 @@ import { useState } from "react";
 import AdminLayout from "@/components/admin-layout";
 import { useAdminSession } from "@/hooks/use-voter-session";
 import { useGetElectionResults } from "@workspace/api-client-react";
-import { Loader2, Download, Trophy, BarChart3, PieChart as PieIcon } from "lucide-react";
+import { Loader2, Download, Trophy, BarChart3, PieChart as PieIcon, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -35,8 +35,8 @@ export default function AdminResultsPage() {
   const { data, isLoading } = useGetElectionResults();
   const [viewMode, setViewMode] = useState<ViewMode>("bars");
 
-  const handleExport = () => {
-    window.location.href = "/api/admin/results/export";
+  const handleExport = (format: "csv" | "pdf") => {
+    window.location.href = `/api/admin/results/export?format=${format}`;
   };
 
   return (
@@ -78,9 +78,13 @@ export default function AdminResultsPage() {
                 <PieIcon className="h-3 w-3" /> Pie
               </button>
             </div>
-            <Button variant="outline" size="sm" onClick={handleExport} data-testid="button-export">
+            <Button variant="outline" size="sm" onClick={() => handleExport("csv")} data-testid="button-export-csv">
               <Download className="h-4 w-4 mr-2" />
-              Export CSV
+              CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleExport("pdf")} data-testid="button-export-pdf">
+              <FileText className="h-4 w-4 mr-2" />
+              PDF
             </Button>
           </div>
         </div>

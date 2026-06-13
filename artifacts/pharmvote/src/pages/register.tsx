@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Shield, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -54,9 +55,12 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b border-border bg-card px-4 py-4">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <img src="/logo.png" alt="PharmSci Logo" className="h-8 w-8 object-contain" />
-          <span className="font-semibold text-sm">PharmSci E-Voting — Student Registration</span>
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="PharmSci Logo" className="h-8 w-8 object-contain" />
+            <span className="font-semibold text-sm">PharmSci E-Voting — Student Registration</span>
+          </div>
+          <ThemeToggle />
         </div>
       </header>
 

@@ -3,6 +3,7 @@ import { useGetElectionStatus } from "@workspace/api-client-react";
 import { Shield, Clock, CheckCircle, Lock, Users, Award } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 function PhaseCountdown({ targetDate }: { targetDate: string }) {
   const target = new Date(targetDate);
@@ -53,11 +54,14 @@ export default function IndexPage() {
               <div className="text-xs text-muted-foreground">Faculty of Pharmaceutical Sciences</div>
             </div>
           </div>
-          <Link href="/admin/login">
-            <span className="text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
-              Admin Access
-            </span>
-          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Link href="/admin/login">
+              <span className="text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
+                Admin Access
+              </span>
+            </Link>
+          </div>
         </div>
       </header>
 
