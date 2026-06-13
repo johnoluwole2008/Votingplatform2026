@@ -6,7 +6,7 @@ import {
   officesTable,
   candidatesTable,
   votesTable,
-  studentRecordsTable,
+  voterRegistrationsTable,
 } from "@workspace/db";
 import { logAuditEvent } from "../lib/audit";
 import { getElectionPhase } from "../lib/election";
@@ -31,18 +31,18 @@ router.get("/ballot", async (req, res): Promise<void> => {
     return;
   }
 
-  const [student] = await db
+  const [voter] = await db
     .select()
-    .from(studentRecordsTable)
-    .where(eq(studentRecordsTable.id, req.session.voterId!))
+    .from(voterRegistrationsTable)
+    .where(eq(voterRegistrationsTable.id, req.session.voterId!))
     .limit(1);
 
-  if (!student) {
+  if (!voter) {
     res.status(401).json({ error: "Session invalid" });
     return;
   }
 
-  if (student.hasVoted) {
+  if (voter.hasVoted) {
     res.status(403).json({ error: "You have already cast your vote." });
     return;
   }
@@ -73,8 +73,8 @@ router.get("/ballot", async (req, res): Promise<void> => {
 
   res.json({
     offices: ballot,
-    voterName: student.fullName,
-    voterLevel: student.level,
+    voterName: voter.fullName,
+    voterLevel: voter.level,
   });
 });
 
@@ -93,27 +93,26 @@ router.post("/ballot/submit", async (req, res): Promise<void> => {
     return;
   }
 
-  const studentId = req.session.voterId!;
+  const voterId = req.session.voterId!;
 
-  const [student] = await db
+  const [voter] = await db
     .select()
-    .from(studentRecordsTable)
-    .where(eq(studentRecordsTable.id, studentId))
+    .from(voterRegistrationsTable)
+    .where(eq(voterRegistrationsTable.id, voterId))
     .limit(1);
 
-  if (!student) {
+  if (!voter) {
     res.status(401).json({ error: "Session invalid" });
     return;
   }
 
-  if (student.hasVoted) {
+  if (voter.hasVoted) {
     res.status(403).json({ error: "You have already cast your vote." });
     return;
   }
 
   const { votes } = parsed.data;
 
-  // Validate that each provided vote references a valid candidate for that office
   if (votes.length > 0) {
     const candidateIds = votes.map((v) => v.candidateId);
     const validCandidates = await db
@@ -131,9 +130,9 @@ router.post("/ballot/submit", async (req, res): Promise<void> => {
   }
 
   await db
-    .update(studentRecordsTable)
+    .update(voterRegistrationsTable)
     .set({ hasVoted: true, voteTimestamp: new Date() })
-    .where(eq(studentRecordsTable.id, studentId));
+    .where(eq(voterRegistrationsTable.id, voterId));
 
   const sessionToken = req.sessionID;
   for (const vote of votes) {
@@ -153,8 +152,8 @@ router.post("/ballot/submit", async (req, res): Promise<void> => {
 
   await logAuditEvent({
     eventType: "vote_cast",
-    description: `Vote cast for ${votes.length} offices (${votes.length} voted, abstained from rest)`,
-    actorId: student.matricNumber,
+    description: `Vote cast for ${votes.length} offices`,
+    actorId: voter.matricNumber,
     actorType: "student",
     ipAddress: undefined,
     metadata: JSON.stringify({ officeCount: votes.length }),

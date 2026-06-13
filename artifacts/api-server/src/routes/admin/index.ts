@@ -10,6 +10,7 @@ import accountsRouter from "./accounts";
 import studentsRouter from "./students";
 import invitesRouter from "./invites";
 import emailRouter from "./email";
+import voterImportRouter from "./voter-import";
 
 const router = Router();
 
@@ -24,5 +25,6 @@ router.use(accountsRouter);
 router.use(studentsRouter);
 router.use(invitesRouter);
 router.use(emailRouter);
+router.use(voterImportRouter);
 
 export default router;

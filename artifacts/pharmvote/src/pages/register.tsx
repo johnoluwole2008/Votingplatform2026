@@ -73,7 +73,7 @@ export default function RegisterPage() {
           <div className="bg-card border border-border rounded-xl shadow-sm p-8">
             <h1 className="text-2xl font-bold text-foreground mb-1">Voter Registration</h1>
             <p className="text-muted-foreground text-sm mb-8">
-              Register once using your official Faculty credentials. Your details will be verified against student records.
+              Register to vote in the Faculty elections. Fill in your details exactly once — your information becomes your voter record.
             </p>
 
             <Form {...form}>

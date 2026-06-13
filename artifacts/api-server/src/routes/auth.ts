@@ -1,9 +1,6 @@
 import { Router } from "express";
 import { eq, and } from "drizzle-orm";
-import {
-  db,
-  studentRecordsTable,
-} from "@workspace/db";
+import { db, voterRegistrationsTable } from "@workspace/db";
 import {
   hashPassword,
   verifyPassword,
@@ -37,41 +34,67 @@ router.post("/auth/register", async (req, res): Promise<void> => {
   const normalizedMatric = matricNumber.trim().toUpperCase();
   const normalizedEmail = email.trim().toLowerCase();
 
-  const [student] = await db
+  const [existing] = await db
     .select()
-    .from(studentRecordsTable)
-    .where(
-      and(
-        eq(studentRecordsTable.matricNumber, normalizedMatric),
-        eq(studentRecordsTable.email, normalizedEmail),
-      ),
-    )
+    .from(voterRegistrationsTable)
+    .where(eq(voterRegistrationsTable.matricNumber, normalizedMatric))
     .limit(1);
 
-  if (!student) {
-    res.status(404).json({
-      error: "No matching student record found. Check your matric number and school email address, or contact the Electoral Committee.",
-    });
+  if (existing) {
+    if (!existing.passwordHash) {
+      if (existing.email !== normalizedEmail) {
+        res.status(409).json({
+          error: "Your matric number is on the import list but the email doesn't match. Contact the Electoral Committee.",
+        });
+        return;
+      }
+      const passwordHash = await hashPassword(password);
+      await db
+        .update(voterRegistrationsTable)
+        .set({ passwordHash, fullName, level: level as never })
+        .where(eq(voterRegistrationsTable.id, existing.id));
+
+      await logAuditEvent({
+        eventType: "voter_registered",
+        description: `Voter activated imported account: ${fullName} (${normalizedMatric})`,
+        actorId: normalizedMatric,
+        actorType: "student",
+        ipAddress: getClientIp(req),
+      });
+
+      res.status(200).json({ success: true, message: "Registration successful. You can now log in on Election Day." });
+      return;
+    }
+
+    res.status(409).json({ error: "You have already registered. Use the Login page to access the ballot." });
     return;
   }
 
-  if (student.personalCodeHash) {
-    res.status(409).json({
-      error: "You have already registered. Use the Login page to access the ballot.",
-    });
+  const [emailConflict] = await db
+    .select()
+    .from(voterRegistrationsTable)
+    .where(eq(voterRegistrationsTable.email, normalizedEmail))
+    .limit(1);
+
+  if (emailConflict) {
+    res.status(409).json({ error: "This email address is already registered. Use the Login page." });
     return;
   }
 
   const passwordHash = await hashPassword(password);
 
-  await db
-    .update(studentRecordsTable)
-    .set({ personalCodeHash: passwordHash })
-    .where(eq(studentRecordsTable.id, student.id));
+  await db.insert(voterRegistrationsTable).values({
+    matricNumber: normalizedMatric,
+    email: normalizedEmail,
+    fullName,
+    level: level as never,
+    passwordHash,
+    ipAddress: getClientIp(req) ?? null,
+  });
 
   await logAuditEvent({
     eventType: "voter_registered",
-    description: `Voter registered: ${student.fullName} (${normalizedMatric})`,
+    description: `Voter registered: ${fullName} (${normalizedMatric})`,
     actorId: normalizedMatric,
     actorType: "student",
     ipAddress: getClientIp(req),
@@ -100,24 +123,23 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 
   if (await isAccountLocked(matricNumber.toUpperCase())) {
     res.status(401).json({
-      error:
-        "Account temporarily locked due to too many failed attempts. Try again in 15 minutes.",
+      error: "Account temporarily locked due to too many failed attempts. Try again in 15 minutes.",
     });
     return;
   }
 
-  const [student] = await db
+  const [voter] = await db
     .select()
-    .from(studentRecordsTable)
+    .from(voterRegistrationsTable)
     .where(
       and(
-        eq(studentRecordsTable.matricNumber, matricNumber.toUpperCase()),
-        eq(studentRecordsTable.email, email.toLowerCase()),
+        eq(voterRegistrationsTable.matricNumber, matricNumber.toUpperCase()),
+        eq(voterRegistrationsTable.email, email.toLowerCase()),
       ),
     )
     .limit(1);
 
-  if (!student) {
+  if (!voter) {
     await recordLoginAttempt(matricNumber.toUpperCase(), ip, false);
     await logAuditEvent({
       eventType: "login_failed",
@@ -130,15 +152,15 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
 
-  if (!student.personalCodeHash) {
+  if (!voter.passwordHash) {
     await recordLoginAttempt(matricNumber.toUpperCase(), ip, false);
     res.status(401).json({
-      error: "No personal code set for this account. Contact the Electoral Committee.",
+      error: "Your account hasn't been activated yet. Please complete your registration on the registration page to set a password.",
     });
     return;
   }
 
-  const valid = await verifyPassword(personalCode, student.personalCodeHash);
+  const valid = await verifyPassword(personalCode, voter.passwordHash);
   if (!valid) {
     await recordLoginAttempt(matricNumber.toUpperCase(), ip, false);
     await logAuditEvent({
@@ -154,23 +176,23 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 
   await recordLoginAttempt(matricNumber.toUpperCase(), ip, true);
 
-  req.session.voterId = student.id;
-  req.session.matricNumber = student.matricNumber;
+  req.session.voterId = voter.id;
+  req.session.matricNumber = voter.matricNumber;
 
   await logAuditEvent({
     eventType: "login_success",
-    description: `Student ${student.fullName} logged in`,
-    actorId: student.matricNumber,
+    description: `Student ${voter.fullName} logged in`,
+    actorId: voter.matricNumber,
     actorType: "student",
     ipAddress: ip,
   });
 
   res.json({
-    id: student.id,
-    matricNumber: student.matricNumber,
-    fullName: student.fullName,
-    level: student.level,
-    hasVoted: student.hasVoted,
+    id: voter.id,
+    matricNumber: voter.matricNumber,
+    fullName: voter.fullName,
+    level: voter.level,
+    hasVoted: voter.hasVoted,
   });
 });
 
@@ -182,7 +204,7 @@ router.post("/auth/logout", async (req, res): Promise<void> => {
   });
 });
 
-// ── Session ────────────────────────────────────────────────────────────────────
+// ── Session ───────────────────────────────────────────────────────────────────
 
 router.get("/auth/me", async (req, res): Promise<void> => {
   if (!req.session.voterId) {
@@ -190,24 +212,24 @@ router.get("/auth/me", async (req, res): Promise<void> => {
     return;
   }
 
-  const [student] = await db
+  const [voter] = await db
     .select()
-    .from(studentRecordsTable)
-    .where(eq(studentRecordsTable.id, req.session.voterId))
+    .from(voterRegistrationsTable)
+    .where(eq(voterRegistrationsTable.id, req.session.voterId))
     .limit(1);
 
-  if (!student) {
+  if (!voter) {
     req.session.destroy(() => {});
     res.status(401).json({ error: "Session invalid" });
     return;
   }
 
   res.json({
-    id: student.id,
-    matricNumber: student.matricNumber,
-    fullName: student.fullName,
-    level: student.level,
-    hasVoted: student.hasVoted,
+    id: voter.id,
+    matricNumber: voter.matricNumber,
+    fullName: voter.fullName,
+    level: voter.level,
+    hasVoted: voter.hasVoted,
   });
 });
 

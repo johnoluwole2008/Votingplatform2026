@@ -113,7 +113,7 @@ export const voterRegistrationsTable = pgTable("voter_registrations", {
   email: text("email").notNull().unique(),
   fullName: text("full_name").notNull(),
   level: academicLevelEnum("level").notNull(),
-  passwordHash: text("password_hash").notNull(),
+  passwordHash: text("password_hash"),
   hasVoted: boolean("has_voted").notNull().default(false),
   ipAddress: text("ip_address"),
   registrationTimestamp: timestamp("registration_timestamp", {

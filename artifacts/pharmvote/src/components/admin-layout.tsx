@@ -15,6 +15,7 @@ import {
   Menu,
   Mail,
   X,
+  Upload,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ const navItems = [
   { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
   { href: "/admin/settings", label: "Settings", icon: Settings },
   { href: "/admin/students", label: "Student Records", icon: Database },
+  { href: "/admin/voter-import", label: "Voter Import", icon: Upload },
   { href: "/admin/email", label: "Bulk Email", icon: Mail },
 ];
 
