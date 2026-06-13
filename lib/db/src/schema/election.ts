@@ -66,6 +66,12 @@ export const electionSettingsTable = pgTable("election_settings", {
   votingEnd: timestamp("voting_end", { withTimezone: true }),
   showLiveResults: boolean("show_live_results").notNull().default(false),
   totalExpectedVoters: integer("total_expected_voters").notNull().default(900),
+  smtpHost: text("smtp_host"),
+  smtpPort: integer("smtp_port").notNull().default(587),
+  smtpUser: text("smtp_user"),
+  smtpPass: text("smtp_pass"),
+  smtpFrom: text("smtp_from"),
+  smtpFromName: text("smtp_from_name").notNull().default("PharmSci E-Voting"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
