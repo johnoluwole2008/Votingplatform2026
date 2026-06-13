@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Trash2, UserPlus, UserCog, Shield, KeyRound, Eye, EyeOff, Link2, Copy, Check, Send } from "lucide-react";
+import { Loader2, Trash2, UserPlus, UserCog, Shield, KeyRound, Eye, EyeOff, Link2, Copy, Check, Send, Mail, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -382,6 +382,22 @@ export default function AdminAccountsPage() {
                   </div>
                   <Button variant="outline" size="sm" onClick={handleCopyInvite} className="shrink-0">
                     {copiedInvite ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant="outline" size="sm"
+                    className="flex-1 gap-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                    onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`You have been invited to set up an admin account on the PharmSci E-Voting Platform.\n\nClick the link below to complete your registration:\n${inviteUrl}\n\nThis link expires in 7 days and can only be used once.`)}`, "_blank")}
+                  >
+                    <MessageCircle className="h-4 w-4" />WhatsApp
+                  </Button>
+                  <Button
+                    variant="outline" size="sm"
+                    className="flex-1 gap-2"
+                    onClick={() => window.open(`mailto:?subject=${encodeURIComponent("PharmSci E-Voting — Admin Invite")}&body=${encodeURIComponent(`You have been invited to set up an admin account on the PharmSci E-Voting Platform.\n\nClick the link below to complete your registration:\n${inviteUrl}\n\nThis link expires in 7 days and can only be used once.`)}`, "_blank")}
+                  >
+                    <Mail className="h-4 w-4" />Email
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">Expires in 7 days. Single use only.</p>

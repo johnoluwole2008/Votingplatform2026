@@ -22,6 +22,7 @@ import AdminAuditPage from "@/pages/admin/audit";
 import AdminSettingsPage from "@/pages/admin/settings";
 import AdminAccountsPage from "@/pages/admin/accounts";
 import AdminStudentsPage from "@/pages/admin/students";
+import AdminEmailPage from "@/pages/admin/email";
 import AdminJoinPage from "@/pages/admin/join";
 import ResultsPage from "@/pages/results";
 
@@ -51,6 +52,7 @@ function Router() {
       <Route path="/admin/settings" component={AdminSettingsPage} />
       <Route path="/admin/accounts" component={AdminAccountsPage} />
       <Route path="/admin/students" component={AdminStudentsPage} />
+      <Route path="/admin/email" component={AdminEmailPage} />
       <Route path="/admin/join/:token" component={AdminJoinPage} />
       <Route path="/results" component={ResultsPage} />
 

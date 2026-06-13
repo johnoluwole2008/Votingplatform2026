@@ -1,5 +1,8 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { processScheduledEmailJobs } from "./routes/admin/email";
+
+setInterval(() => { processScheduledEmailJobs().catch(() => {}); }, 60_000);
 
 const rawPort = process.env["PORT"];
 

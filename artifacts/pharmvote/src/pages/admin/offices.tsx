@@ -17,7 +17,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, Trash2, Vote, ChevronDown, ChevronUp, UserPlus, Pencil, Check, X, ImageIcon } from "lucide-react";
+import { Loader2, Plus, Trash2, Vote, ChevronDown, ChevronUp, UserPlus, Pencil, Check, X, ImageIcon, Upload } from "lucide-react";
+import { useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 const officeSchema = z.object({
@@ -30,7 +31,7 @@ const candidateSchema = z.object({
   fullName: z.string().min(2, "Candidate name required"),
   bio: z.string().optional(),
   level: z.string().optional(),
-  photoUrl: z.string().url("Enter a valid URL").optional().or(z.literal("")),
+  photoUrl: z.string().optional().or(z.literal("")),
   officeId: z.number(),
 });
 
@@ -60,6 +61,9 @@ export default function AdminOfficesPage() {
   const [addingCandidateFor, setAddingCandidateFor] = useState<number | null>(null);
   const [editingOfficeId, setEditingOfficeId] = useState<number | null>(null);
   const [showOfficeForm, setShowOfficeForm] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const photoFileRef = useRef<HTMLInputElement>(null);
 
   const { data: offices, isLoading } = useListOffices();
   const createOffice = useCreateOffice();
@@ -84,6 +88,31 @@ export default function AdminOfficesPage() {
     resolver: zodResolver(candidateSchema),
     defaultValues: { fullName: "", bio: "", level: "", photoUrl: "", officeId: 0 },
   });
+
+  const handlePhotoUpload = async (file: File) => {
+    setPhotoUploading(true);
+    try {
+      const reqRes = await fetch("/api/storage/uploads/request-url", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentType: file.type, folder: "candidate-photos" }),
+      });
+      if (!reqRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadUrl, objectPath } = await reqRes.json();
+      const putRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!putRes.ok) throw new Error("Upload failed");
+      const servedUrl = `/api/storage/objects/${objectPath}`;
+      candidateForm.setValue("photoUrl", servedUrl);
+      setPhotoPreview(URL.createObjectURL(file));
+      toast({ title: "Photo uploaded!" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally { setPhotoUploading(false); }
+  };
 
   const handleCreateOffice = (data: OfficeFormData) => {
     createOffice.mutate(
@@ -154,6 +183,7 @@ export default function AdminOfficesPage() {
           queryClient.invalidateQueries({ queryKey: ["listOffices"] });
           toast({ title: "Candidate added" });
           candidateForm.reset();
+          setPhotoPreview(null);
           setAddingCandidateFor(null);
         },
         onError: () => toast({ title: "Failed to add candidate", variant: "destructive" }),
@@ -391,12 +421,44 @@ export default function AdminOfficesPage() {
                                 <FormItem>
                                   <FormLabel className="text-xs flex items-center gap-1.5">
                                     <ImageIcon className="h-3 w-3" />
-                                    Photo URL (optional)
+                                    Photo (optional)
                                   </FormLabel>
-                                  <FormControl>
-                                    <Input {...field} placeholder="https://example.com/photo.jpg" />
-                                  </FormControl>
-                                  <p className="text-xs text-muted-foreground">Paste a public image URL. Will be shown on the ballot.</p>
+                                  <div className="flex items-center gap-3">
+                                    {(photoPreview || field.value) && (
+                                      <img
+                                        src={photoPreview ?? field.value}
+                                        alt="Preview"
+                                        className="h-12 w-12 rounded-full object-cover border border-border"
+                                      />
+                                    )}
+                                    <div className="flex flex-col gap-1 flex-1">
+                                      <input
+                                        ref={photoFileRef}
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = ""; }}
+                                      />
+                                      <Button
+                                        type="button" variant="outline" size="sm"
+                                        disabled={photoUploading}
+                                        onClick={() => photoFileRef.current?.click()}
+                                        className="justify-start"
+                                      >
+                                        {photoUploading
+                                          ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Uploading…</>
+                                          : <><Upload className="h-3.5 w-3.5 mr-1.5" />{field.value ? "Replace photo" : "Upload photo"}</>}
+                                      </Button>
+                                      {field.value && (
+                                        <button
+                                          type="button"
+                                          className="text-xs text-muted-foreground hover:text-destructive text-left"
+                                          onClick={() => { field.onChange(""); setPhotoPreview(null); }}
+                                        >Remove photo</button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">Choose from gallery or camera. Shown on the ballot.</p>
                                   <FormMessage />
                                 </FormItem>
                               )} />
@@ -412,7 +474,7 @@ export default function AdminOfficesPage() {
                         ) : (
                           <button
                             className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
-                            onClick={() => { setAddingCandidateFor(office.id); candidateForm.reset(); }}
+                            onClick={() => { setAddingCandidateFor(office.id); candidateForm.reset(); setPhotoPreview(null); }}
                             data-testid={`button-add-candidate-${office.id}`}
                           >
                             <UserPlus className="h-4 w-4" />

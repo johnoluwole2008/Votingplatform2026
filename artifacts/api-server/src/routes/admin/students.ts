@@ -4,6 +4,15 @@ import { db, studentRecordsTable } from "@workspace/db";
 import { logAuditEvent } from "../../lib/audit";
 import { ImportStudentRecordsBody } from "@workspace/api-zod";
 import { hashPassword } from "../../lib/auth";
+import { z } from "zod";
+
+const SingleStudentBody = z.object({
+  matricNumber: z.string().min(1),
+  email: z.string().email(),
+  fullName: z.string().min(2),
+  level: z.enum(["100L", "200L", "300L", "400L", "500L", "600L"]),
+  personalCode: z.string().optional(),
+});
 
 const router = Router();
 
@@ -123,6 +132,49 @@ router.post("/admin/student-records", async (req, res): Promise<void> => {
     errors,
     message: `Successfully imported ${imported} records.`,
   });
+});
+
+// POST /admin/student-records/single — add one student manually
+router.post("/admin/student-records/single", async (req, res): Promise<void> => {
+  if (!requireEditor(req, res)) return;
+  const parsed = SingleStudentBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid data" }); return; }
+  const { matricNumber, email, fullName, level, personalCode } = parsed.data;
+  const normalizedMatric = matricNumber.trim().toUpperCase();
+  const normalizedEmail = email.trim().toLowerCase();
+  let personalCodeHash: string | undefined;
+  if (personalCode?.trim()) personalCodeHash = await hashPassword(personalCode.trim());
+  try {
+    await db.insert(studentRecordsTable).values({
+      matricNumber: normalizedMatric,
+      email: normalizedEmail,
+      fullName: fullName.trim(),
+      level: level as never,
+      ...(personalCodeHash ? { personalCodeHash } : {}),
+    }).onConflictDoUpdate({
+      target: studentRecordsTable.matricNumber,
+      set: { email: normalizedEmail, fullName: fullName.trim(), level: level as never, ...(personalCodeHash ? { personalCodeHash } : {}) },
+    });
+  } catch (err: any) {
+    if (err.message?.includes("unique") || err.message?.includes("duplicate")) {
+      res.status(409).json({ error: "A student with this email already exists." }); return;
+    }
+    throw err;
+  }
+  await logAuditEvent({ eventType: "student_record_added", description: `Manual add: ${fullName} (${normalizedMatric})`, actorId: String(req.session.adminId), actorType: "admin" });
+  res.status(201).json({ success: true });
+});
+
+// DELETE /admin/student-records — clear all records
+router.delete("/admin/student-records", async (req, res): Promise<void> => {
+  if (!requireEditor(req, res)) return;
+  const { confirm } = req.body;
+  if (confirm !== "CLEAR") { res.status(400).json({ error: 'Send { confirm: "CLEAR" } to confirm deletion.' }); return; }
+  const [result] = await db.select({ count: count() }).from(studentRecordsTable);
+  const total = Number(result?.count ?? 0);
+  await db.delete(studentRecordsTable);
+  await logAuditEvent({ eventType: "student_records_cleared", description: `All student records cleared (${total} deleted)`, actorId: String(req.session.adminId), actorType: "admin" });
+  res.json({ success: true, deleted: total });
 });
 
 export default router;

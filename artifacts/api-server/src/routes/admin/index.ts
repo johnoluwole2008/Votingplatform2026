@@ -9,6 +9,7 @@ import settingsRouter from "./settings";
 import accountsRouter from "./accounts";
 import studentsRouter from "./students";
 import invitesRouter from "./invites";
+import emailRouter from "./email";
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use(settingsRouter);
 router.use(accountsRouter);
 router.use(studentsRouter);
 router.use(invitesRouter);
+router.use(emailRouter);
 
 export default router;

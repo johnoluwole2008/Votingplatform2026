@@ -13,6 +13,7 @@ import {
   LogOut,
   ShieldCheck,
   Menu,
+  Mail,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -33,6 +34,7 @@ const navItems = [
   { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
   { href: "/admin/settings", label: "Settings", icon: Settings },
   { href: "/admin/students", label: "Student Records", icon: Database },
+  { href: "/admin/email", label: "Bulk Email", icon: Mail },
 ];
 
 const superAdminItems = [
