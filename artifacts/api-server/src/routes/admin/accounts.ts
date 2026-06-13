@@ -64,6 +64,34 @@ router.post("/admin/accounts", async (req, res): Promise<void> => {
   });
 });
 
+router.put("/admin/accounts/:id/password", async (req, res): Promise<void> => {
+  if (!requireSuperAdmin(req, res)) return;
+
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const { password } = req.body;
+  if (!password || typeof password !== "string" || password.length < 8) {
+    res.status(400).json({ error: "Password must be at least 8 characters." }); return;
+  }
+
+  const [existing] = await db.select().from(adminsTable).where(eq(adminsTable.id, id)).limit(1);
+  if (!existing) { res.status(404).json({ error: "Account not found" }); return; }
+
+  const passwordHash = await hashPassword(password);
+  await db.update(adminsTable).set({ passwordHash }).where(eq(adminsTable.id, id));
+
+  await logAuditEvent({
+    eventType: "admin_password_reset",
+    description: `Super admin reset password for: ${existing.email}`,
+    actorId: String(req.session.adminId),
+    actorType: "admin",
+  });
+
+  res.json({ success: true, message: "Password updated" });
+});
+
 router.delete("/admin/accounts/:id", async (req, res): Promise<void> => {
   if (!requireSuperAdmin(req, res)) return;
 

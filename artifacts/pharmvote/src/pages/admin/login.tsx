@@ -7,7 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
+import { ShieldCheck, AlertCircle, Loader2, Eye, EyeOff, KeyRound } from "lucide-react";
 import { useState } from "react";
 
 const schema = z.object({
@@ -23,6 +23,7 @@ export default function AdminLoginPage() {
   const login = useLoginAdmin();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -39,7 +40,7 @@ export default function AdminLoginPage() {
           setLocation("/admin/dashboard");
         },
         onError: (err: any) => {
-          const msg = err?.response?.data?.error ?? "Authentication failed. Check your credentials.";
+          const msg = err?.data?.error ?? err?.response?.data?.error ?? "Authentication failed. Check your credentials.";
           setErrorMsg(msg);
         },
       },
@@ -86,7 +87,9 @@ export default function AdminLoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Password</FormLabel>
+                    </div>
                     <FormControl>
                       <div className="relative">
                         <Input
@@ -125,6 +128,26 @@ export default function AdminLoginPage() {
               </Button>
             </form>
           </Form>
+
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => setShowForgot((v) => !v)}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
+            >
+              Forgot password?
+            </button>
+          </div>
+
+          {showForgot && (
+            <div className="mt-4 flex items-start gap-2.5 bg-muted/60 border border-border rounded-lg px-3 py-3 text-xs text-muted-foreground">
+              <KeyRound className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+              <p>
+                Password resets are handled by the <span className="font-medium text-foreground">Super Administrator</span>.
+                Ask them to log in and go to <span className="font-medium text-foreground">Admin Accounts → Reset Password</span> for your account.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
