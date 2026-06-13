@@ -377,7 +377,7 @@ export default function AdminAccountsPage() {
               <div>
                 <label className="text-sm font-medium text-foreground">Share this link</label>
                 <div className="flex items-center gap-2 mt-1.5">
-                  <div className="flex-1 bg-muted rounded-lg px-3 py-2 text-xs font-mono text-muted-foreground truncate border border-border">
+                  <div className="flex-1 bg-muted rounded-lg px-3 py-2 text-xs font-mono text-muted-foreground break-all border border-border select-all">
                     {inviteUrl}
                   </div>
                   <Button variant="outline" size="sm" onClick={handleCopyInvite} className="shrink-0">
