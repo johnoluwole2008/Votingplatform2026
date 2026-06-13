@@ -7,7 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Shield, Lock, ArrowLeft, AlertCircle } from "lucide-react";
+import { Shield, Lock, ArrowLeft, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 
@@ -25,6 +25,7 @@ export default function LoginPage() {
   const queryClient = useQueryClient();
   const login = useLoginVoter();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showCode, setShowCode] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -126,7 +127,25 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel>Personal Code</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="Your personal code from registration" {...field} data-testid="input-personal-code" autoComplete="current-password" />
+                        <div className="relative">
+                          <Input
+                            type={showCode ? "text" : "password"}
+                            placeholder="Your personal code from registration"
+                            {...field}
+                            data-testid="input-personal-code"
+                            autoComplete="current-password"
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCode((v) => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                            tabIndex={-1}
+                            aria-label={showCode ? "Hide code" : "Show code"}
+                          >
+                            {showCode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

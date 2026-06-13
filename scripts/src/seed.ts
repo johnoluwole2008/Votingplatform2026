@@ -19,14 +19,14 @@ async function seed() {
     .where(eq(adminsTable.email, "johnoluwole2008@gmail.com"))
     .limit(1);
   if (existingAdmin.length === 0) {
-    const passwordHash = await bcrypt.hash("Admin@12345", 12);
+    const passwordHash = await bcrypt.hash("Admin@123", 12);
     await db.insert(adminsTable).values({
       email: "johnoluwole2008@gmail.com",
       name: "Electoral Committee",
       passwordHash,
       role: "super_admin",
     });
-    console.log("✓ Super admin created — email: johnoluwole2008@gmail.com  password: Admin@12345");
+    console.log("✓ Super admin created — email: johnoluwole2008@gmail.com  password: Admin@123");
   } else {
     console.log("• Super admin already exists");
   }
