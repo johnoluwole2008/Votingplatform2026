@@ -7,7 +7,7 @@ When bundled with esbuild, `connect-pg-simple`'s `createTableIfMissing: true` op
 
 **Why:** esbuild only bundles JS; SQL/text assets in node_modules are not included in the output bundle.
 
-**How to apply:** Never use `createTableIfMissing: true`. Instead, create the session table in the DB during first setup or migration:
+**How to apply:** Never use `createTableIfMissing: true`. Instead, export an `ensureSessionTable()` async function from `app.ts` that runs the DDL with `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`, and call it from `index.ts` before `app.listen()`. This self-heals on every deploy including fresh production databases.
 
 ```sql
 CREATE TABLE IF NOT EXISTS "session" (
@@ -19,4 +19,4 @@ CREATE TABLE IF NOT EXISTS "session" (
 CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
 ```
 
-This applies to any Express app in this monorepo that uses connect-pg-simple with an esbuild bundler.
+**Production proxy loop fix:** In Replit's deployed environment, also set `app.set("trust proxy", 1)` and `sameSite: "lax"` (not `"strict"`). Without `trust proxy`, Express sees requests as HTTP even over HTTPS — `secure: true` cookies are dropped and every authenticated request returns 401, causing an infinite login→dashboard→login redirect loop.

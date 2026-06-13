@@ -20,6 +20,23 @@ declare module "express-session" {
 
 const PgStore = connectPgSimple(session);
 
+// Ensure the session table exists before the session middleware tries to use it.
+// connect-pg-simple's createTableIfMissing is NOT used because esbuild strips
+// the bundled .sql asset file. We create it directly with raw SQL instead.
+export async function ensureSessionTable(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "session" (
+      "sid"    varchar        NOT NULL COLLATE "default",
+      "sess"   json           NOT NULL,
+      "expire" timestamp(6)   NOT NULL,
+      CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire")
+  `);
+}
+
 const app: Express = express();
 
 // Trust Replit's reverse proxy so Express sees HTTPS correctly.
