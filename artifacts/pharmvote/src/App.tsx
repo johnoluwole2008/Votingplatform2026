@@ -10,6 +10,9 @@ import BallotPage from "@/pages/ballot";
 import BallotReviewPage from "@/pages/ballot-review";
 import BallotSuccessPage from "@/pages/ballot-success";
 
+import RegisterPage from "@/pages/register";
+import RegisterSuccessPage from "@/pages/register-success";
+
 import AdminLoginPage from "@/pages/admin/login";
 import AdminDashboardPage from "@/pages/admin/dashboard";
 import AdminVotersPage from "@/pages/admin/voters";
@@ -33,6 +36,8 @@ function Router() {
     <Switch>
       <Route path="/" component={IndexPage} />
       <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
+      <Route path="/register/success" component={RegisterSuccessPage} />
       <Route path="/ballot" component={BallotPage} />
       <Route path="/ballot/review" component={BallotReviewPage} />
       <Route path="/ballot/success" component={BallotSuccessPage} />
